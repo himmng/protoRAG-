@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -24,9 +24,9 @@
     </script>
     <style>
         :root { --indian-red: #CD5C5C; }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
-        .dark ::-webkit-scrollbar-thumb { background: #475569; }
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .dark ::-webkit-scrollbar-thumb { background: #334155; }
 
         body, aside, main, div, button, textarea {
             transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
@@ -53,8 +53,14 @@
         .sidebar-collapsed .bottom-btn span { display: none; }
         .sidebar-collapsed .bottom-btn { justify-content: center; }
 
-        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        .animate-zoom-in { animation: zoomIn 0.2s ease-out forwards; }
+        @keyframes zoomIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        
+        .animate-fade-out { animation: fadeOut 0.2s ease-out forwards; }
+        @keyframes fadeOut { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.95); } }
 
         @keyframes gear-rotate {
             from { transform: rotate(0deg); }
@@ -74,6 +80,9 @@
             60% { content: '...'; }
             80%, 100% { content: ''; }
         }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
 <body class="bg-white dark:bg-slate-950 text-gray-900 dark:text-slate-100 font-sans h-screen flex overflow-hidden">
@@ -110,7 +119,6 @@
         
         <div class="flex-1 overflow-y-auto px-3 space-y-1 py-2" id="session-list"></div>
         
-
         <!-- Settings Section -->
         <div class="p-3 border-t border-gray-200 dark:border-slate-800">
             <button onclick="toggleSettingsModal()" class="bottom-btn flex items-center gap-4 w-full p-2.5 rounded-xl text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-800 transition-all overflow-hidden group">
@@ -132,16 +140,13 @@
             </button>
         </div>
 
-        <!-- Floating Document Bar - Wider with larger delete icons -->
+        <!-- Floating Document Bar -->
         <div id="floating-doc-bar" class="hidden absolute top-4 left-6 z-30 min-w-[320px] max-w-[calc(100%-180px)] transition-all duration-300">
             <div class="bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border border-gray-200 dark:border-slate-700 rounded-2xl shadow-xl p-2 flex items-center gap-3">
-                
                 <div class="flex flex-wrap gap-2 px-1 items-center max-h-32 overflow-y-auto flex-1" id="doc-pills">
-                    <!-- Ensure your JS generates the delete SVG with width="18" and height="18" -->
+                    <!-- Pills generated dynamically -->
                 </div>
-
                 <div class="h-6 w-px bg-gray-200 dark:bg-slate-700 flex-shrink-0"></div>
-
                 <button onclick="document.getElementById('file-input').click()" 
                         class="flex-shrink-0 p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:text-indian-red hover:bg-indian-red/10 transition-colors">
                     <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
@@ -156,29 +161,26 @@
             <div class="max-w-3xl mx-auto space-y-6 pb-44" id="messages"></div>
         </div>
 
-        <!-- Bottom Input Area - Expanded Width -->
+        <!-- Bottom Input Area -->
         <div class="fixed bottom-0 w-full bg-gradient-to-t from-white dark:from-slate-950 via-white dark:via-slate-950 to-transparent pt-12 pb-4 px-4">
-            <div class="max-w-6xl ml-4 md:ml-40"> <!-- Increased to 6xl for more width -->
-                
+            <div class="max-w-6xl ml-4 md:ml-40"> 
                 <div class="flex flex-col md:flex-row items-stretch md:items-end justify-start gap-3">
-                    
                     <!-- Upload Button -->
                     <button onclick="document.getElementById('file-input').click()" 
-                            class="group relative flex items-center justify-center gap-3 px-4 py-3 mb-1 bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-400 rounded-2xl border border-gray-300 dark:border-slate-700 shadow-sm min-w-[180px]">
+                            class="group relative flex items-center justify-center gap-3 px-4 py-3 mb-1 bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-400 rounded-2xl border border-gray-300 dark:border-slate-700 shadow-sm min-w-[180px] hover:text-indian-red hover:border-indian-red/50 transition-colors">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="13" x2="12" y2="17"></line><line x1="10" y1="15" x2="14" y2="15"></line></svg>
                         <span class="text-sm font-semibold whitespace-nowrap">Upload Document</span>
-                        
                         <div class="relative flex items-center ml-1">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
                             <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 dark:bg-slate-700 text-white text-[10px] rounded-lg shadow-xl z-50">
                                 <p class="font-bold mb-1 border-b border-gray-600 pb-1">Supported Formats:</p>
-                                <p>txt, csv, pdf, xlsx, pptx, json/l, yaml, etc.</p>
+                                <p>txt, csv, pdf, xlsx, pptx, json, yaml, etc.</p>
                                 <div class="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-gray-800 dark:border-t-slate-700"></div>
                             </div>
                         </div>
                     </button>
 
-                    <!-- Chat Box (flex-1 expands to fill the 6xl space) -->
+                    <!-- Chat Box -->
                     <form id="chat-form" class="flex-1 relative flex items-end bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-[2rem] shadow-2xl px-4 py-2 ring-1 ring-black/5">
                         <textarea id="message-input" rows="1" placeholder="Type a message..." 
                                 class="flex-1 max-h-48 py-3 px-2 bg-transparent outline-none resize-none text-gray-800 dark:text-slate-100" 
@@ -191,8 +193,8 @@
                 </div>
 
                 <!-- Spaced Helper Text -->
-                <div class="text-[11px] text-gray-500 dark:text-slate-400 text-left mt-2 px-20 select-none ml-[180px]">
-                    <div class="flex items-center gap-80"> 
+                <div class="text-[11px] text-gray-500 dark:text-slate-400 text-left mt-2 px-20 select-none ml-[180px] hidden md:block">
+                    <div class="flex items-center justify-between"> 
                         <span><b>Disclaimer:</b> protoRAG⁺ can make mistakes.</span>
                         <span><b>Tip:</b> Use <b>Shift+Enter</b> for new line.</span>
                     </div>
@@ -200,15 +202,11 @@
             </div>
         </div>
 
-
-
-
-<input type="file" id="file-input" class="hidden" onchange="uploadFile(this.files[0])">
-
+        <input type="file" id="file-input" class="hidden" onchange="uploadFile(this.files[0])">
     </main>
 
     <!-- Settings Modal -->
-    <div id="settings-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div id="settings-modal" class="hidden fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md shadow-2xl border border-gray-200 dark:border-slate-800">
             <div class="p-6 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center">
                 <h2 class="text-xl font-bold">Settings</h2>
@@ -218,7 +216,7 @@
                 <div>
                     <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Provider</label>
                     <select id="config-provider" class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red">
-                        <option value="openapi">OpenAI</option>
+                        <option value="openai">OpenAI</option>
                         <option value="ollama">Ollama</option>
                         <option value="litellm">Litellm</option>
                         <option value="custom">Custom</option>
@@ -280,24 +278,7 @@
             el.style.height = '48px';
             el.style.height = el.scrollHeight + 'px';
         }
-        function openDocumentModal(fileName, content) {
-            const modal = document.getElementById('document-modal');
-            const container = document.getElementById('modal-container');
-            const body = document.getElementById('modal-body');
-            document.getElementById('modal-title').innerText = fileName;
-            
-            body.innerHTML = `<pre class="whitespace-pre-wrap font-sans text-sm">${content}</pre>`;
-            modal.classList.replace('hidden', 'flex');
-            requestAnimationFrame(() => container.classList.replace('scale-90', 'scale-100'), container.classList.replace('opacity-0', 'opacity-100'));
-        }
 
-        function closeDocumentModal() {
-            const modal = document.getElementById('document-modal');
-            const container = document.getElementById('modal-container');
-            container.classList.replace('scale-100', 'scale-90');
-            container.classList.replace('opacity-100', 'opacity-0');
-            setTimeout(() => modal.classList.replace('flex', 'hidden'), 300);
-        }
         async function loadSessions() {
             try {
                 const res = await fetch('/api/sessions');
@@ -325,9 +306,6 @@
         function updateDocBar(docs) {
             const bar = document.getElementById('floating-doc-bar');
             const pills = document.getElementById('doc-pills');
-            const countEl = document.getElementById('doc-count');
-            
-            if (countEl) countEl.innerText = docs ? docs.length : 0;
             
             if (!docs || docs.length === 0) {
                 bar.classList.add('hidden');
@@ -335,46 +313,34 @@
             }
             bar.classList.remove('hidden');
 
-            // Helper to get specific icons for file types
             const getFileIcon = (filename) => {
                 const ext = filename.split('.').pop().toLowerCase();
-                
-                // PDF Icon (Red - classic document with fold and content lines)
                 if (ext === 'pdf') {
                     return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-500 flex-shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>`;
                 } 
-                // Excel/CSV Icon (Green - Grid/Table layout)
                 else if (['xlsx', 'xls', 'csv'].includes(ext)) {
                     return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-600 flex-shrink-0"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line></svg>`;
                 } 
-                // Word Icon (Blue - Document with 'W' style alignment)
                 else if (['doc', 'docx'].includes(ext)) {
                     return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-600 flex-shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M8 13h8"></path><path d="M8 17h8"></path><path d="M10 9H8"></path></svg>`;
                 }
-                // Text File Icon (Slate/Gray - Simple lines)
                 else if (ext === 'txt') {
                     return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-500 flex-shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="8" y2="18"></line><line x1="16" y1="14" x2="8" y2="14"></line></svg>`;
                 }
-                
-                // Default Generic Document Icon
                 return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-indian-red flex-shrink-0"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>`;
             };
 
-            // Force strict vertical list layout and allow dynamic growth
             pills.style.display = 'flex';
             pills.style.flexDirection = 'column';
             pills.style.flexWrap = 'nowrap';
             pills.style.gap = '8px';
             pills.style.width = '100%';
-            pills.style.height = 'auto'; 
-            pills.style.maxHeight = '60vh'; 
-            pills.style.overflowY = 'auto'; 
 
             pills.innerHTML = docs.map(d => `
                 <div class="flex items-center justify-between gap-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2.5 rounded-xl text-[12px] font-semibold text-slate-600 dark:text-slate-300 shadow-sm group hover:border-indian-red/30 transition-colors animate-fade-in w-full box-border">
-                    <div class="flex items-center gap-2 overflow-hidden flex-1">
+                    <div class="flex items-center gap-2 overflow-hidden flex-1 cursor-pointer" onclick="openDocModal('${d}')">
                         ${getFileIcon(d)}
-                        <span class="truncate cursor-pointer hover:text-indian-red transition-colors" onclick="inspectDocument('${d}')" title="${d}">${d}</span>
+                        <span class="truncate hover:text-indian-red transition-colors" title="Inspect ${d}">${d}</span>
                     </div>
                     <button onclick="deleteDocument('${d}', event)" class="flex-shrink-0 p-1 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all flex items-center justify-center" title="Delete document">
                         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
@@ -385,8 +351,94 @@
             `).join('');
         }
 
-        function inspectDocument(filename) {
-            window.open(`/api/sessions/${currentSessionId}/documents/${encodeURIComponent(filename)}`, '_blank');
+        function openDocModal(filename) {
+            // Uses global currentSessionId instead of window.currentSessionId
+            if (!currentSessionId) return;
+
+            // Remove existing overlay if any
+            const existing = document.getElementById('doc-modal-overlay');
+            if (existing) existing.remove();
+
+            // Create background blur overlay
+            const overlay = document.createElement('div');
+            overlay.id = 'doc-modal-overlay';
+            // Same classes as the settings modal for matching blur & dim
+            overlay.className = 'fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 md:p-10 animate-fade-in';
+            
+            overlay.onclick = (e) => {
+                if (e.target === overlay) closeDocModal();
+            };
+
+            const fileUrl = `/api/sessions/${currentSessionId}/documents/${encodeURIComponent(filename)}`;
+            const ext = filename.split('.').pop().toLowerCase();
+            
+            let contentHtml = '';
+            
+            if (ext === 'pdf') {
+                contentHtml = `<iframe src="${fileUrl}" class="w-full h-full rounded-lg border-none"></iframe>`;
+            } else if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(ext)) {
+                contentHtml = `<div class="flex items-center justify-center h-full p-4"><img src="${fileUrl}" class="max-w-full max-h-full object-contain shadow-2xl rounded-lg" alt="${filename}"/></div>`;
+            } else {
+                contentHtml = `<div id="doc-modal-content-area" class="flex items-center justify-center h-full"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indian-red"></div></div>`;
+                fetch(fileUrl)
+                    .then(r => r.text())
+                    .then(text => {
+                        const codeBox = document.getElementById('doc-modal-content-area');
+                        if (codeBox) {
+                            codeBox.innerHTML = `<pre class="p-6 text-sm font-mono text-slate-700 dark:text-slate-300 whitespace-pre-wrap h-full overflow-auto w-full">${text.replace(/</g, '&lt;')}</pre>`;
+                            codeBox.classList.remove('flex', 'items-center', 'justify-center');
+                        }
+                    })
+                    .catch(err => {
+                        const codeBox = document.getElementById('doc-modal-content-area');
+                        if (codeBox) codeBox.innerHTML = `<div class="text-red-500 p-6">Failed to load content.</div>`;
+                    });
+            }
+
+            overlay.innerHTML = `
+                <div class="relative w-full max-w-5xl h-[85vh] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden animate-zoom-in">
+                    <!-- Header -->
+                    <div class="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm sticky top-0 z-10">
+                        <div class="flex items-center gap-3">
+                            <div class="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-indian-red">
+                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100 truncate max-w-[200px] md:max-w-md">${filename}</h3>
+                                <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Document Inspection</p>
+                            </div>
+                        </div>
+                        <button onclick="closeDocModal()" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                    
+                    <!-- Content Area -->
+                    <div id="doc-modal-content-area" class="flex-1 overflow-hidden bg-slate-50/50 dark:bg-slate-950/50">
+                        ${contentHtml}
+                    </div>
+
+                    <!-- Footer -->
+                    <div class="p-3 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2 bg-white dark:bg-slate-900">
+                        <a href="${fileUrl}" download="${filename}" class="flex items-center gap-2 px-4 py-2 bg-indian-red text-white text-xs font-bold rounded-xl hover:opacity-90 transition-opacity">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            Download
+                        </a>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(overlay);
+        }
+
+        function closeDocModal() {
+            const overlay = document.getElementById('doc-modal-overlay');
+            if (overlay) {
+                overlay.classList.add('animate-fade-out');
+                setTimeout(() => {
+                    overlay.remove();
+                }, 200);
+            }
         }
 
         async function deleteDocument(filename, e) {
@@ -562,7 +614,6 @@
                 </div>
             `;
         }
-
 
         function toggleSidebar() {
             const s = document.getElementById('sidebar');
