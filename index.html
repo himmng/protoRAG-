@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>protoRAG⁺</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 15C58 15 65 22 65 30C73 30 80 37 80 45C80 53 73 60 65 60C65 68 58 75 50 75C42 75 35 68 35 60C27 60 20 53 20 45C20 37 27 30 35 30C35 22 42 15 50 15Z' fill='%23CD5C5C'/%3E%3Ccircle cx='50' cy='45' r='8' fill='%23CD5C5C' stroke='white' stroke-width='2'/%3E%3C/svg%3E">
+    
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'indian-red': '#CD5C5C',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root { --indian-red: #CD5C5C; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
+        .dark ::-webkit-scrollbar-thumb { background: #475569; }
+
+        body, aside, main, div, button, textarea {
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+        }
+
+        #sidebar { transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1); overflow: hidden; }
+        .sidebar-expanded { width: 280px; }
+        .sidebar-collapsed { width: 72px; }
+
+        .logo-container { transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .sidebar-collapsed .logo-container { transform: rotate(180deg); }
+        
+        .arrow-icon { transition: transform 0.4s ease; }
+        .sidebar-collapsed .arrow-icon { transform: rotate(180deg); }
+
+        .nav-text { 
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            white-space: nowrap;
+        }
+        .sidebar-collapsed .nav-text { opacity: 0; transform: translateX(-10px); pointer-events: none; }
+        
+        .sidebar-collapsed .new-chat-btn span { display: none; }
+        .sidebar-collapsed .new-chat-btn { justify-content: center; padding: 10px; }
+        .sidebar-collapsed .bottom-btn span { display: none; }
+        .sidebar-collapsed .bottom-btn { justify-content: center; }
+
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        @keyframes gear-rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .animate-gear {
+            animation: gear-rotate 2.5s linear infinite;
+        }
+
+        .loading-dots:after {
+            content: '.';
+            animation: dots 1.5s steps(5, end) infinite;
+        }
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60% { content: '...'; }
+            80%, 100% { content: ''; }
+        }
+    </style>
+</head>
+<body class="bg-white dark:bg-slate-950 text-gray-900 dark:text-slate-100 font-sans h-screen flex overflow-hidden">
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar-expanded relative z-30 h-full bg-gray-50 dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 flex flex-col shadow-sm">
+        <div class="p-4 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between overflow-hidden">
+            <div class="flex items-center gap-3 cursor-pointer" onclick="toggleSidebar()">
+                <div class="logo-container flex-shrink-0">
+                    <svg width="36" height="36" viewBox="0 0 100 100" fill="none">
+                        <path d="M50 15C58 15 65 22 65 30C73 30 80 37 80 45C80 53 73 60 65 60C65 68 58 75 50 75C42 75 35 68 35 60C27 60 20 53 20 45C20 37 27 30 35 30C35 22 42 15 50 15Z" fill="#CD5C5C"/>
+                        <circle cx="50" cy="45" r="8" fill="#CD5C5C" stroke="white" stroke-width="2"/>
+                    </svg>
+                </div>
+                <span class="nav-text font-bold text-xl tracking-tight text-[#CD5C5C]">protoRAG⁺</span>
+            </div>
+            <button onclick="toggleSidebar()" class="nav-text p-1.5 rounded-lg text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-800 transition-colors">
+                <svg class="arrow-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="11 17 6 12 11 7"></polyline>
+                    <polyline points="18 17 13 12 18 7"></polyline>
+                </svg>
+            </button>
+        </div>
+
+        <div class="p-3">
+            <button onclick="createNewSession()" class="new-chat-btn w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-200 py-2.5 px-4 rounded-xl hover:shadow-md dark:hover:bg-slate-700 flex items-center gap-3 transition-all font-medium">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                <span class="nav-text">New Chat</span>
+            </button>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto px-3 space-y-1 py-2" id="session-list"></div>
+        
+        <!-- Separated Upload Document Section -->
+        <div class="px-3 pb-3">
+            <button onclick="document.getElementById('file-input').click()" class="bottom-btn flex items-center gap-4 w-full p-2.5 rounded-xl text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-800 transition-all overflow-hidden">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="12" y1="13" x2="12" y2="17"></line>
+                    <line x1="10" y1="15" x2="14" y2="15"></line>
+                </svg>
+                <span class="nav-text text-sm font-medium">Upload Document</span>
+            </button>
+        </div>
+
+        <!-- Settings Section -->
+        <div class="p-3 border-t border-gray-200 dark:border-slate-800">
+            <button onclick="toggleSettingsModal()" class="bottom-btn flex items-center gap-4 w-full p-2.5 rounded-xl text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-800 transition-all overflow-hidden group">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0 group-hover:rotate-90 transition-transform duration-500">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+                <span class="nav-text text-sm font-medium">Settings</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="flex-1 flex flex-col h-full relative bg-white dark:bg-slate-950">
+        <div class="absolute top-4 right-6 z-40 flex items-center gap-3">
+            <button onclick="toggleDarkMode()" class="p-2.5 bg-white/80 dark:bg-slate-800/80 backdrop-blur border border-gray-200 dark:border-slate-700 rounded-full shadow-lg hover:scale-110 transition-all">
+                <svg id="theme-sun" class="block dark:hidden text-orange-500" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+                <svg id="theme-moon" class="hidden dark:block text-blue-400" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            </button>
+        </div>
+
+        <!-- Floating Document Bar - Relocated to top left -->
+        <div id="floating-doc-bar" class="hidden absolute top-4 left-6 z-30 max-w-[calc(100%-120px)] transition-all duration-300">
+            <div class="bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border border-gray-200 dark:border-slate-700 rounded-2xl shadow-xl p-1.5 flex items-center gap-2">
+                <div class="flex flex-wrap gap-2 px-1 items-center max-h-32 overflow-y-auto" id="doc-pills">
+                    <!-- Pills dynamically added -->
+                </div>
+                <div class="h-5 w-px bg-gray-200 dark:bg-slate-700 mx-0.5 flex-shrink-0"></div>
+                <button onclick="document.getElementById('file-input').click()" class="flex-shrink-0 p-1 rounded-lg text-gray-400 hover:text-indian-red hover:bg-indian-red/10 transition-colors" title="Upload another document">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-8 pt-24">
+            <div class="max-w-3xl mx-auto space-y-6 pb-32" id="messages"></div>
+        </div>
+
+        <input type="file" id="file-input" class="hidden" onchange="uploadFile(this.files[0])">
+        
+        <div class="absolute bottom-0 w-full bg-gradient-to-t from-white dark:from-slate-950 via-white dark:via-slate-950 to-transparent pt-12 pb-4 px-4">
+            <div class="max-w-3xl mx-auto">
+                <form id="chat-form" class="relative flex items-end bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-[2rem] shadow-2xl px-4 py-2 ring-1 ring-black/5">
+                    <textarea id="message-input" rows="1" placeholder="Type a message..." class="flex-1 max-h-48 py-3 px-2 bg-transparent outline-none resize-none text-gray-800 dark:text-slate-100" oninput="autoResizeTextArea(this)"></textarea>
+                    <button type="submit" class="p-2.5 bg-indian-red text-white rounded-full hover:scale-105 transition-all shadow-lg mb-1 flex-shrink-0">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                    </button>
+                </form>
+                <div class="text-[10px] text-gray-400 dark:text-slate-600 text-center mt-2 px-4 select-none">
+                    Use <b>Shift+Enter</b> for new line. protoRAG⁺ can make mistakes.
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md shadow-2xl border border-gray-200 dark:border-slate-800">
+            <div class="p-6 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center">
+                <h2 class="text-xl font-bold">Settings</h2>
+                <button onclick="toggleSettingsModal()" class="text-gray-400 hover:text-gray-600 text-2xl font-light">&times;</button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Provider</label>
+                    <select id="config-provider" class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red">
+                        <option value="openai">OpenAI</option>
+                        <option value="ollama">Ollama</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">API Key</label>
+                    <input id="config-key" type="password" placeholder="Enter API key" class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Model</label>
+                        <input id="config-model" type="text" value="gpt-4o" class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Embedding</label>
+                        <input id="config-embed" type="text" value="text-embedding-3-small" class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Base URL</label>
+                    <input id="config-url" type="text" value="https://api.openai.com/v1" class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red">
+                </div>
+            </div>
+            <div class="p-6 bg-gray-50 dark:bg-slate-800/50 flex justify-end">
+                <button onclick="saveSettings()" class="bg-indian-red text-white px-6 py-2.5 rounded-xl font-bold shadow-lg hover:brightness-110">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentSessionId = localStorage.getItem('last_session_id') || crypto.randomUUID();
+        const config = {
+            provider: 'openai',
+            base_url: 'https://api.openai.com/v1',
+            api_key: '',
+            model_name: 'gpt-4o',
+            embedding_model: 'text-embedding-3-small'
+        };
+
+        const savedConfig = localStorage.getItem('app_config');
+        if (savedConfig) Object.assign(config, JSON.parse(savedConfig));
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSessions();
+            loadSessionHistory(currentSessionId);
+            updateConfigUI();
+            
+            const msgInput = document.getElementById('message-input');
+            msgInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    document.getElementById('chat-form').requestSubmit();
+                }
+            });
+        });
+
+        function autoResizeTextArea(el) {
+            el.style.height = '48px';
+            el.style.height = el.scrollHeight + 'px';
+        }
+
+        async function loadSessions() {
+            try {
+                const res = await fetch('/api/sessions');
+                const data = await res.json();
+                const list = document.getElementById('session-list');
+                
+                const ragIcon = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><circle cx="10" cy="13" r="2"></circle><line x1="12" y1="15" x2="14" y2="17"></line></svg>`;
+                const chatIcon = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
+
+                list.innerHTML = data.sessions.map(s => `
+                    <div class="group relative flex items-center p-2.5 rounded-xl text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-800 cursor-pointer ${s.id === currentSessionId ? 'bg-gray-200/50 dark:bg-slate-800/50 active-session' : ''}" onclick="switchSession('${s.id}')">
+                        <div class="flex-shrink-0 transition-colors ${s.id === currentSessionId ? 'text-indian-red' : ''}">
+                            ${s.is_rag ? ragIcon : chatIcon}
+                        </div>
+                        <span class="nav-text ml-4 text-sm truncate flex-1 pr-6">${s.preview || 'Untitled Chat'}</span>
+                        
+                        <button onclick="event.stopPropagation(); deleteSession('${s.id}')" class="absolute right-2 opacity-0 group-hover:opacity-100 p-1.5 hover:text-red-500 transition-all rounded-lg hover:bg-white dark:hover:bg-slate-700">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        </button>
+                    </div>
+                `).join('');
+            } catch (e) { console.error(e); }
+        }
+
+        function updateDocBar(docs) {
+            const bar = document.getElementById('floating-doc-bar');
+            const pills = document.getElementById('doc-pills');
+            if (!docs || docs.length === 0) {
+                bar.classList.add('hidden');
+                return;
+            }
+            bar.classList.remove('hidden');
+            pills.innerHTML = docs.map(d => `
+                <div class="flex items-center gap-2 bg-gray-100 dark:bg-slate-700 py-1 px-2.5 rounded-lg text-[11px] font-bold text-gray-600 dark:text-slate-300 group shadow-sm border border-gray-200 dark:border-slate-600">
+                    <div class="cursor-pointer truncate max-w-[120px] hover:text-indian-red transition-colors" onclick="inspectDocument('${d}')" title="Inspect ${d}">${d}</div>
+                    <button onclick="deleteDocument('${d}', event)" class="text-gray-400 hover:text-red-500 focus:outline-none" title="Delete document">
+                        <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function inspectDocument(filename) {
+            window.open(`/api/sessions/${currentSessionId}/documents/${encodeURIComponent(filename)}`, '_blank');
+        }
+
+        async function deleteDocument(filename, e) {
+            if (e) e.stopPropagation();
+            if (!confirm(`Delete ${filename}? This will rebuild the document context for this chat.`)) return;
+            
+            try {
+                const res = await fetch(`/api/sessions/${currentSessionId}/documents/${encodeURIComponent(filename)}/delete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                if (res.ok) {
+                    await loadSessionHistory(currentSessionId);
+                }
+            } catch (err) {
+                console.error("Failed to delete document:", err);
+                alert("Failed to delete document.");
+            }
+        }
+
+        async function deleteSession(sid) {
+            if (!confirm('Delete this session and all its data?')) return;
+            try {
+                await fetch(`/api/sessions/${sid}`, { method: 'DELETE' });
+                if (sid === currentSessionId) {
+                    createNewSession();
+                } else {
+                    loadSessions();
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function loadSessionHistory(sid) {
+            currentSessionId = sid;
+            localStorage.setItem('last_session_id', sid);
+            const res = await fetch(`/api/sessions/${sid}`);
+            const data = await res.json();
+            const container = document.getElementById('messages');
+            container.innerHTML = '';
+            if (!data.history || data.history.length === 0) renderWelcome();
+            else data.history.forEach(msg => appendMessage(msg.role, msg.content));
+            
+            updateDocBar(data.documents || []);
+            loadSessions();
+        }
+
+        function createNewSession() {
+            currentSessionId = crypto.randomUUID();
+            localStorage.setItem('last_session_id', currentSessionId);
+            document.getElementById('messages').innerHTML = '';
+            renderWelcome();
+            updateDocBar([]);
+            loadSessions();
+        }
+
+        async function switchSession(sid) {
+            await loadSessionHistory(sid);
+        }
+
+        async function uploadFile(file) {
+            if (!file) return;
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('session_id', currentSessionId);
+            formData.append('provider', config.provider);
+            formData.append('base_url', config.base_url);
+            formData.append('api_key', config.api_key);
+            formData.append('model_name', config.model_name);
+            formData.append('embedding_model', config.embedding_model);
+
+            appendMessage('assistant', `Indexing **${file.name}**...`);
+            try {
+                const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                const result = await res.json();
+                appendMessage('assistant', result.message);
+                await loadSessionHistory(currentSessionId);
+            } catch (e) {
+                appendMessage('assistant', `Upload failed: ${e.message}`);
+            }
+        }
+
+        document.getElementById('chat-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const input = document.getElementById('message-input');
+            const msg = input.value.trim();
+            if (!msg) return;
+
+            input.value = '';
+            input.style.height = '48px';
+            document.getElementById('welcome-msg')?.remove();
+
+            appendMessage('user', msg);
+            
+            const assistantMsgDiv = appendMessage('assistant', `
+                <div class="flex items-center gap-3">
+                    <svg width="24" height="24" viewBox="0 0 100 100" class="animate-gear flex-shrink-0">
+                        <path d="M50 15C58 15 65 22 65 30C73 30 80 37 80 45C80 53 73 60 65 60C65 68 58 75 50 75C42 75 35 68 35 60C27 60 20 53 20 45C20 37 27 30 35 30C35 22 42 15 50 15Z" fill="#CD5C5C"/>
+                        <circle cx="50" cy="45" r="8" fill="#CD5C5C" stroke="white" stroke-width="2"/>
+                    </svg>
+                    <span class="text-[11px] font-medium text-gray-400 dark:text-slate-500 uppercase tracking-widest loading-dots">Thinking</span>
+                </div>
+            `);
+
+            let fullText = "";
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: currentSessionId, message: msg, config })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const dataStr = line.slice(6);
+                            if (dataStr === '[DONE]') break;
+                            try {
+                                const parsed = JSON.parse(dataStr);
+                                if (fullText === "") assistantMsgDiv.innerHTML = ""; 
+                                fullText += parsed.content;
+                                assistantMsgDiv.innerHTML = marked.parse(fullText);
+                            } catch (e) {}
+                        }
+                    }
+                }
+                loadSessions();
+            } catch (e) {
+                assistantMsgDiv.innerHTML = `Error: ${e.message}`;
+            }
+        };
+
+        function appendMessage(role, content) {
+            const container = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`;
+            
+            const inner = document.createElement('div');
+            inner.className = `max-w-[85%] p-4 rounded-2xl ${
+                role === 'user' 
+                ? 'bg-indian-red text-white rounded-tr-none shadow-md' 
+                : 'bg-gray-100 dark:bg-slate-800 dark:text-slate-100 rounded-tl-none border border-gray-200 dark:border-slate-700 shadow-sm'
+            } prose dark:prose-invert prose-sm`;
+            
+            inner.innerHTML = content.includes('animate-gear') ? content : marked.parse(content);
+            div.appendChild(inner);
+            container.appendChild(div);
+            
+            const chatContainer = document.getElementById('chat-container');
+            chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' });
+            return inner;
+        }
+
+        function renderWelcome() {
+            document.getElementById('messages').innerHTML = `
+                <div id="welcome-msg" class="text-center py-20 animate-fade-in">
+                    <div class="inline-flex items-center justify-center w-24 h-24 bg-indian-red/10 rounded-[2.5rem] mb-6">
+                        <svg width="60" height="60" viewBox="0 0 100 100">
+                            <path d="M50 15C58 15 65 22 65 30C73 30 80 37 80 45C80 53 73 60 65 60C65 68 58 75 50 75C42 75 35 68 35 60C27 60 20 53 20 45C20 37 27 30 35 30C35 22 42 15 50 15Z" fill="#CD5C5C"/>
+                            <circle cx="50" cy="45" r="8" fill="#CD5C5C" stroke="white" stroke-width="2"/>
+                        </svg>
+                    </div>
+                    <h1 class="text-4xl font-black text-gray-800 dark:text-white mb-2">protoRAG⁺</h1>
+                    <p class="text-gray-500 dark:text-slate-400">Intelligent RAG with local isolation.</p>
+                </div>
+            `;
+        }
+
+        function toggleSidebar() {
+            const s = document.getElementById('sidebar');
+            s.classList.toggle('sidebar-expanded');
+            s.classList.toggle('sidebar-collapsed');
+        }
+
+        function toggleSettingsModal() {
+            document.getElementById('settings-modal').classList.toggle('hidden');
+        }
+
+        function updateConfigUI() {
+            document.getElementById('config-provider').value = config.provider;
+            document.getElementById('config-url').value = config.base_url;
+            document.getElementById('config-key').value = config.api_key;
+            document.getElementById('config-model').value = config.model_name;
+            document.getElementById('config-embed').value = config.embedding_model;
+        }
+
+        function saveSettings() {
+            config.provider = document.getElementById('config-provider').value;
+            config.base_url = document.getElementById('config-url').value;
+            config.api_key = document.getElementById('config-key').value;
+            config.model_name = document.getElementById('config-model').value;
+            config.embedding_model = document.getElementById('config-embed').value;
+            localStorage.setItem('app_config', JSON.stringify(config));
+            toggleSettingsModal();
+        }
+
+        function toggleDarkMode() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        }
+
+        if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        }
+    </script>
+</body>
+</html>
