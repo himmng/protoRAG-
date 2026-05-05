@@ -1,2 +1,8 @@
 [build]
   functions = "netlify/functions"
+[[redirects]]
+  from = "/proxy-ai/*"
+  to = "https://radiation-temperature-june-establish.trycloudflare.com/:splat"
+  status = 200
+  force = true
+  headers = {X-From = "Netlify"}
