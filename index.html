@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>protoRAG⁺</title>
-    <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='20 15 60 60'%3E%3Cpath d='M50 15C58 15 65 22 65 30C73 30 80 37 80 45C80 53 73 60 65 60C65 68 58 75 50 75C42 75 35 68 35 60C27 60 20 53 20 45C20 37 27 30 35 30C35 22 42 15 50 15Z' fill='%23CD5C5C'/%3E%3Ccircle cx='50' cy='45' r='8' fill='%23CD5C5C' stroke='white' stroke-width='2'/%3E%3C/svg%3E">
     
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
@@ -66,9 +65,7 @@
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
         }
-        .animate-gear {
-            animation: gear-rotate 2.5s linear infinite;
-        }
+        .animate-gear { animation: gear-rotate 2.5s linear infinite; }
 
         .loading-dots:after {
             content: '.';
@@ -83,6 +80,22 @@
 
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Provider hint badge */
+        .provider-hint {
+            font-size: 10px;
+            font-family: monospace;
+            background: rgba(205,92,92,0.1);
+            color: #CD5C5C;
+            border-radius: 6px;
+            padding: 2px 7px;
+            margin-top: 5px;
+            display: inline-block;
+            letter-spacing: 0.01em;
+        }
+        .dark .provider-hint {
+            background: rgba(205,92,92,0.18);
+        }
     </style>
 </head>
 <body class="bg-white dark:bg-slate-950 text-gray-900 dark:text-slate-100 font-sans h-screen flex overflow-hidden">
@@ -119,7 +132,6 @@
         
         <div class="flex-1 overflow-y-auto px-3 space-y-1 py-2" id="session-list"></div>
         
-        <!-- Settings Section -->
         <div class="p-3 border-t border-gray-200 dark:border-slate-800">
             <button onclick="toggleSettingsModal()" class="bottom-btn flex items-center gap-4 w-full p-2.5 rounded-xl text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-800 transition-all overflow-hidden group">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0 group-hover:rotate-90 transition-transform duration-500">
@@ -143,9 +155,7 @@
         <!-- Floating Document Bar -->
         <div id="floating-doc-bar" class="hidden absolute top-4 left-6 z-30 min-w-[320px] max-w-[calc(100%-180px)] transition-all duration-300">
             <div class="bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border border-gray-200 dark:border-slate-700 rounded-2xl shadow-xl p-2 flex items-center gap-3">
-                <div class="flex flex-wrap gap-2 px-1 items-center max-h-32 overflow-y-auto flex-1" id="doc-pills">
-                    <!-- Pills generated dynamically -->
-                </div>
+                <div class="flex flex-wrap gap-2 px-1 items-center max-h-32 overflow-y-auto flex-1" id="doc-pills"></div>
                 <div class="h-6 w-px bg-gray-200 dark:bg-slate-700 flex-shrink-0"></div>
                 <button onclick="document.getElementById('file-input').click()" 
                         class="flex-shrink-0 p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:text-indian-red hover:bg-indian-red/10 transition-colors">
@@ -165,7 +175,6 @@
         <div class="fixed bottom-0 w-full bg-gradient-to-t from-white dark:from-slate-950 via-white dark:via-slate-950 to-transparent pt-12 pb-4 px-4">
             <div class="max-w-6xl ml-4 md:ml-40"> 
                 <div class="flex flex-col md:flex-row items-stretch md:items-end justify-start gap-3">
-                    <!-- Upload Button -->
                     <button onclick="document.getElementById('file-input').click()" 
                             class="group relative flex items-center justify-center gap-3 px-4 py-3 mb-1 bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-400 rounded-2xl border border-gray-300 dark:border-slate-700 shadow-sm min-w-[180px] hover:text-indian-red hover:border-indian-red/50 transition-colors">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="13" x2="12" y2="17"></line><line x1="10" y1="15" x2="14" y2="15"></line></svg>
@@ -180,7 +189,6 @@
                         </div>
                     </button>
 
-                    <!-- Chat Box -->
                     <form id="chat-form" class="flex-1 relative flex items-end bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-[2rem] shadow-2xl px-4 py-2 ring-1 ring-black/5">
                         <textarea id="message-input" rows="1" placeholder="Type a message..." 
                                 class="flex-1 max-h-48 py-3 px-2 bg-transparent outline-none resize-none text-gray-800 dark:text-slate-100" 
@@ -192,7 +200,6 @@
                     </form>
                 </div>
 
-                <!-- Spaced Helper Text -->
                 <div class="text-[11px] text-gray-500 dark:text-slate-400 text-left mt-2 px-20 select-none ml-[180px] hidden md:block">
                     <div class="flex items-center justify-between"> 
                         <span><b>Disclaimer:</b> protoRAG⁺ can make mistakes.</span>
@@ -224,27 +231,32 @@
                         <div class="group relative">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-gray-400 cursor-help"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
                             <div class="absolute bottom-full right-0 mb-2 hidden group-hover:block w-64 p-3 bg-gray-800 text-white text-[10px] rounded-xl shadow-2xl z-50 normal-case leading-relaxed">
-                                Path where documents, embeddings, and database indexes are stored. Changing this will move the root of your local RAG environment.
+                                Path where documents, embeddings, and database indexes are stored.
                             </div>
                         </div>
                     </div>
                     <input id="config-data-dir" type="text" placeholder="e.g. /home/user/protorag_data" class="w-full bg-white dark:bg-slate-800 p-3 rounded-xl outline-none border border-gray-200 dark:border-slate-700 focus:border-indian-red transition-all font-mono text-xs">
                 </div>
 
-                <!-- API Provider & Key -->
+                <!-- Provider & Key -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 ml-1">Provider</label>
-                        <select id="config-provider" class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red text-sm">
-                            <option value="openai">OpenAI</option>
+                        <select id="config-provider" onchange="onProviderChange(this.value)"
+                                class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red text-sm">
                             <option value="ollama">Ollama</option>
-                            <option value="litellm">Litellm</option>
+                            <option value="lmstudio">LM Studio</option>
+                            <option value="openai">OpenAI</option>
+                            <option value="litellm">LiteLLM</option>
                             <option value="custom">Custom</option>
                         </select>
+                        <!-- Dynamic hint under provider -->
+                        <div id="provider-hint" class="provider-hint mt-1"></div>
                     </div>
                     <div>
                         <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 ml-1">API Key</label>
-                        <input id="config-key" type="password" placeholder="sk-..." class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red text-sm">
+                        <input id="config-key" type="password" placeholder="none / sk-..." class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red text-sm">
+                        <div class="text-[10px] text-gray-400 mt-1 ml-1">Leave blank or "none" for local providers</div>
                     </div>
                 </div>
 
@@ -252,18 +264,41 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 ml-1">LLM Model</label>
-                        <input id="config-model" type="text" placeholder="e.g. gpt-4o" class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red text-sm">
+                        <input id="config-model" type="text" placeholder="e.g. gemma3:4b" class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red text-sm">
                     </div>
                     <div>
-                        <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 ml-1">Embedding</label>
-                        <input id="config-embed" type="text" placeholder="e.g. mxbai-embed" class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red text-sm">
+                        <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 ml-1">Embedding Model</label>
+                        <input id="config-embed" type="text" placeholder="e.g. mxbai-embed-large" class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red text-sm">
                     </div>
                 </div>
 
-                <!-- Endpoint -->
+                <!-- Base URL -->
                 <div>
                     <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 ml-1">Base URL</label>
-                    <input id="config-url" type="text" placeholder="e.g. http://localhost:11434/v1" class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red text-sm">
+                    <input id="config-url" type="text" class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red text-sm font-mono">
+                    <div id="url-hint" class="text-[10px] text-gray-400 mt-1 ml-1"></div>
+                </div>
+
+                <!-- Provider cheat-sheet -->
+                <div class="bg-gray-50 dark:bg-slate-800/40 rounded-2xl border border-gray-100 dark:border-slate-800 p-4">
+                    <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3">Provider quick-reference</p>
+                    <table class="w-full text-[11px] text-gray-500 dark:text-slate-400">
+                        <thead><tr class="border-b border-gray-200 dark:border-slate-700">
+                            <th class="text-left pb-1 font-bold">Provider</th>
+                            <th class="text-left pb-1 font-bold">Default base URL</th>
+                            <th class="text-left pb-1 font-bold">API key</th>
+                        </tr></thead>
+                        <tbody class="space-y-1 font-mono">
+                            <tr><td class="py-1 pr-2">Ollama</td><td class="py-1 pr-2">http://localhost:11434</td><td class="py-1">none</td></tr>
+                            <tr><td class="py-1 pr-2">LM Studio</td><td class="py-1 pr-2">http://localhost:1234</td><td class="py-1">lm-studio</td></tr>
+                            <tr><td class="py-1 pr-2">LiteLLM</td><td class="py-1 pr-2">http://localhost:4000</td><td class="py-1">any</td></tr>
+                            <tr><td class="py-1 pr-2">OpenAI</td><td class="py-1 pr-2">https://api.openai.com/v1</td><td class="py-1">sk-…</td></tr>
+                            <tr><td class="py-1 pr-2">Custom</td><td class="py-1 pr-2">your endpoint</td><td class="py-1">as needed</td></tr>
+                        </tbody>
+                    </table>
+                    <p class="text-[10px] text-gray-400 mt-3">
+                        ℹ️ You don't need to add <code class="bg-gray-200 dark:bg-slate-700 px-1 rounded">/v1</code> for Ollama or LM Studio — the backend appends it automatically. For OpenAI or custom endpoints that already include <code class="bg-gray-200 dark:bg-slate-700 px-1 rounded">/v1</code>, it will not be duplicated.
+                    </p>
                 </div>
             </div>
 
@@ -274,16 +309,36 @@
         </div>
     </div>
 
-    <!-- Document Inspection Modal (Dynamic) -->
     <script>
+        // -----------------------------------------------------------------------
+        // Provider defaults
+        // Base URL here is what the USER sets — no /v1 needed for Ollama/LMStudio
+        // because the backend's normalise_base_url() handles it.
+        // -----------------------------------------------------------------------
+        const PROVIDER_DEFAULTS = {
+            ollama:   { base_url: 'http://localhost:11434',       api_key: 'none',        hint: 'Auto-appends /v1 · needs OLLAMA_ORIGINS set' },
+            lmstudio: { base_url: 'http://localhost:1234',        api_key: 'lm-studio',   hint: 'Auto-appends /v1 · LM Studio server mode' },
+            openai:   { base_url: 'https://api.openai.com/v1',    api_key: '',            hint: 'Include /v1 in URL · real API key required' },
+            litellm:  { base_url: 'http://localhost:4000',        api_key: 'any',         hint: 'Proxy root · /v1 added by LiteLLM automatically' },
+            custom:   { base_url: '',                             api_key: '',            hint: 'Use the exact endpoint your server expects' },
+        };
+
+        const URL_HINTS = {
+            ollama:   'e.g. http://localhost:11434 or your cloudflared URL',
+            lmstudio: 'e.g. http://localhost:1234',
+            openai:   'e.g. https://api.openai.com/v1',
+            litellm:  'e.g. http://localhost:4000',
+            custom:   'Full base URL including path if needed',
+        };
+
         let currentSessionId = localStorage.getItem('last_session_id') || crypto.randomUUID();
         const config = {
-            data_dir: './protorag_storage', // Default storage directory
-            provider: 'ollama',
-            base_url: 'http://localhost:11434/v1',
-            api_key: 'none',
-            model_name: 'gemma-4-e4b:latest',
-            embedding_model: 'mxbai-embed:latest'
+            data_dir:        './protorag_storage',
+            provider:        'ollama',
+            base_url:        'http://localhost:11434',
+            api_key:         'none',
+            model_name:      'gemma3:4b',
+            embedding_model: 'mxbai-embed-large',
         };
 
         const savedConfig = localStorage.getItem('app_config');
@@ -308,14 +363,29 @@
             el.style.height = el.scrollHeight + 'px';
         }
 
+        // Called when provider dropdown changes
+        function onProviderChange(provider) {
+            const defaults = PROVIDER_DEFAULTS[provider] || PROVIDER_DEFAULTS.custom;
+            const urlInput   = document.getElementById('config-url');
+            const keyInput   = document.getElementById('config-key');
+            const hintEl     = document.getElementById('provider-hint');
+            const urlHintEl  = document.getElementById('url-hint');
+
+            // Only overwrite URL/key if user hasn't customised them yet
+            urlInput.value   = defaults.base_url;
+            keyInput.value   = defaults.api_key;
+            urlInput.placeholder = URL_HINTS[provider] || '';
+            hintEl.textContent   = defaults.hint;
+            urlHintEl.textContent = URL_HINTS[provider] || '';
+        }
+
         async function loadSessions() {
             try {
-                // We pass config so the backend knows where to look for sessions based on data_dir
                 const res = await fetch(`/api/sessions?data_dir=${encodeURIComponent(config.data_dir)}`);
                 const data = await res.json();
                 const list = document.getElementById('session-list');
                 
-                const ragIcon = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><circle cx="10" cy="13" r="2"></circle><line x1="12" y1="15" x2="14" y2="17"></line></svg>`;
+                const ragIcon  = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><circle cx="10" cy="13" r="2"></circle><line x1="12" y1="15" x2="14" y2="17"></line></svg>`;
                 const chatIcon = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
 
                 list.innerHTML = (data.sessions || []).map(s => `
@@ -324,7 +394,6 @@
                             ${s.is_rag ? ragIcon : chatIcon}
                         </div>
                         <span class="nav-text ml-4 text-sm truncate flex-1 pr-6">${s.preview || 'Untitled Chat'}</span>
-                        
                         <button onclick="event.stopPropagation(); deleteSession('${s.id}')" class="absolute right-2 opacity-0 group-hover:opacity-100 p-1.5 hover:text-red-500 transition-all rounded-lg hover:bg-white dark:hover:bg-slate-700">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                         </button>
@@ -334,29 +403,20 @@
         }
 
         function updateDocBar(docs) {
-            const bar = document.getElementById('floating-doc-bar');
+            const bar   = document.getElementById('floating-doc-bar');
             const pills = document.getElementById('doc-pills');
-            
-            if (!docs || docs.length === 0) {
-                bar.classList.add('hidden');
-                return;
-            }
+            if (!docs || docs.length === 0) { bar.classList.add('hidden'); return; }
             bar.classList.remove('hidden');
 
             const getFileIcon = (filename) => {
                 const ext = filename.split('.').pop().toLowerCase();
-                const colors = {
-                    pdf: 'text-red-500',
-                    xlsx: 'text-emerald-600', csv: 'text-emerald-600', xls: 'text-emerald-600',
-                    doc: 'text-blue-600', docx: 'text-blue-600',
-                    txt: 'text-slate-500'
-                };
+                const colors = { pdf: 'text-red-500', xlsx: 'text-emerald-600', csv: 'text-emerald-600', xls: 'text-emerald-600', doc: 'text-blue-600', docx: 'text-blue-600', txt: 'text-slate-500' };
                 return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${colors[ext] || 'text-indian-red'} flex-shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>`;
             };
 
-            pills.style.display = 'flex';
+            pills.style.display       = 'flex';
             pills.style.flexDirection = 'column';
-            pills.style.gap = '8px';
+            pills.style.gap           = '8px';
 
             pills.innerHTML = docs.map(d => `
                 <div class="flex items-center justify-between gap-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2.5 rounded-xl text-[12px] font-semibold text-slate-600 dark:text-slate-300 shadow-sm group hover:border-indian-red/30 transition-colors animate-fade-in w-full box-border">
@@ -373,7 +433,6 @@
 
         function openDocModal(filename) {
             if (!currentSessionId) return;
-
             const existing = document.getElementById('doc-modal-overlay');
             if (existing) existing.remove();
 
@@ -382,18 +441,15 @@
             overlay.className = 'fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 md:p-10 animate-fade-in';
             overlay.onclick = (e) => { if (e.target === overlay) closeDocModal(); };
 
-            // Backend needs session_id and data_dir to find the file
             const fileUrl = `/api/sessions/${currentSessionId}/documents/${encodeURIComponent(filename)}?data_dir=${encodeURIComponent(config.data_dir)}`;
             const ext = filename.split('.').pop().toLowerCase();
-            
-            let contentHtml = `<div id="doc-modal-content-area" class="flex items-center justify-center h-full"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indian-red"></div></div>`;
-            
+
             overlay.innerHTML = `
                 <div class="relative w-full max-w-5xl h-[85vh] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden animate-zoom-in">
                     <div class="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm sticky top-0 z-10">
                         <div class="flex items-center gap-3">
                             <div class="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-indian-red">
-                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
                             </div>
                             <div>
                                 <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100 truncate max-w-[200px] md:max-w-md">${filename}</h3>
@@ -405,7 +461,7 @@
                         </button>
                     </div>
                     <div id="doc-modal-content-area" class="flex-1 overflow-hidden bg-slate-50/50 dark:bg-slate-950/50">
-                        ${contentHtml}
+                        <div class="flex items-center justify-center h-full"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indian-red"></div></div>
                     </div>
                     <div class="p-3 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2 bg-white dark:bg-slate-900">
                         <a href="${fileUrl}" download="${filename}" class="flex items-center gap-2 px-4 py-2 bg-indian-red text-white text-xs font-bold rounded-xl hover:opacity-90 transition-opacity">
@@ -415,33 +471,24 @@
                     </div>
                 </div>
             `;
-
             document.body.appendChild(overlay);
 
-            // Fetch content
             if (ext === 'pdf') {
                 document.getElementById('doc-modal-content-area').innerHTML = `<iframe src="${fileUrl}" class="w-full h-full rounded-lg border-none"></iframe>`;
             } else if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(ext)) {
                 document.getElementById('doc-modal-content-area').innerHTML = `<div class="flex items-center justify-center h-full p-4"><img src="${fileUrl}" class="max-w-full max-h-full object-contain shadow-2xl rounded-lg"/></div>`;
             } else {
-                fetch(fileUrl)
-                    .then(r => r.text())
-                    .then(text => {
-                        const area = document.getElementById('doc-modal-content-area');
-                        area.innerHTML = `<pre class="p-6 text-sm font-mono text-slate-700 dark:text-slate-300 whitespace-pre-wrap h-full overflow-auto w-full">${text.replace(/</g, '&lt;')}</pre>`;
-                    })
-                    .catch(() => {
-                        document.getElementById('doc-modal-content-area').innerHTML = `<div class="text-red-500 p-6">Failed to load.</div>`;
-                    });
+                fetch(fileUrl).then(r => r.text()).then(text => {
+                    document.getElementById('doc-modal-content-area').innerHTML = `<pre class="p-6 text-sm font-mono text-slate-700 dark:text-slate-300 whitespace-pre-wrap h-full overflow-auto w-full">${text.replace(/</g, '&lt;')}</pre>`;
+                }).catch(() => {
+                    document.getElementById('doc-modal-content-area').innerHTML = `<div class="text-red-500 p-6">Failed to load.</div>`;
+                });
             }
         }
 
         function closeDocModal() {
             const overlay = document.getElementById('doc-modal-overlay');
-            if (overlay) {
-                overlay.classList.add('animate-fade-out');
-                setTimeout(() => overlay.remove(), 200);
-            }
+            if (overlay) { overlay.classList.add('animate-fade-out'); setTimeout(() => overlay.remove(), 200); }
         }
 
         async function deleteDocument(filename, e) {
@@ -469,13 +516,12 @@
         async function loadSessionHistory(sid) {
             currentSessionId = sid;
             localStorage.setItem('last_session_id', sid);
-            const res = await fetch(`/api/sessions/${sid}?data_dir=${encodeURIComponent(config.data_dir)}`);
+            const res  = await fetch(`/api/sessions/${sid}?data_dir=${encodeURIComponent(config.data_dir)}`);
             const data = await res.json();
             const container = document.getElementById('messages');
             container.innerHTML = '';
             if (!data.history || data.history.length === 0) renderWelcome();
             else data.history.forEach(msg => appendMessage(msg.role, msg.content));
-            
             updateDocBar(data.documents || []);
             loadSessions();
         }
@@ -489,21 +535,18 @@
             loadSessions();
         }
 
-        async function switchSession(sid) {
-            await loadSessionHistory(sid);
-        }
+        async function switchSession(sid) { await loadSessionHistory(sid); }
 
         async function uploadFile(file) {
             if (!file) return;
             const formData = new FormData();
             formData.append('file', file);
             formData.append('session_id', currentSessionId);
-            // Append all config including data_dir
             for (const key in config) { formData.append(key, config[key]); }
 
             appendMessage('assistant', `Indexing **${file.name}**...`);
             try {
-                const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                const res    = await fetch('/api/upload', { method: 'POST', body: formData });
                 const result = await res.json();
                 appendMessage('assistant', result.message);
                 await loadSessionHistory(currentSessionId);
@@ -513,7 +556,7 @@
         document.getElementById('chat-form').onsubmit = async (e) => {
             e.preventDefault();
             const input = document.getElementById('message-input');
-            const msg = input.value.trim();
+            const msg   = input.value.trim();
             if (!msg) return;
 
             input.value = '';
@@ -539,7 +582,7 @@
                     body: JSON.stringify({ session_id: currentSessionId, message: msg, config })
                 });
 
-                const reader = response.body.getReader();
+                const reader  = response.body.getReader();
                 const decoder = new TextDecoder();
 
                 while (true) {
@@ -553,7 +596,7 @@
                             if (dataStr === '[DONE]') break;
                             try {
                                 const parsed = JSON.parse(dataStr);
-                                if (fullText === "") assistantMsgDiv.innerHTML = ""; 
+                                if (fullText === "") assistantMsgDiv.innerHTML = "";
                                 fullText += parsed.content;
                                 assistantMsgDiv.innerHTML = marked.parse(fullText);
                             } catch (e) {}
@@ -566,15 +609,14 @@
 
         function appendMessage(role, content) {
             const container = document.getElementById('messages');
-            const div = document.createElement('div');
+            const div   = document.createElement('div');
             div.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`;
             const inner = document.createElement('div');
             inner.className = `max-w-[85%] p-4 rounded-2xl ${role === 'user' ? 'bg-indian-red text-white rounded-tr-none shadow-md' : 'bg-gray-100 dark:bg-slate-800 dark:text-slate-100 rounded-tl-none border border-gray-200 dark:border-slate-700 shadow-sm'} prose dark:prose-invert prose-sm`;
             inner.innerHTML = content.includes('animate-gear') ? content : marked.parse(content);
             div.appendChild(inner);
             container.appendChild(div);
-            const chatContainer = document.getElementById('chat-container');
-            chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' });
+            document.getElementById('chat-container').scrollTo({ top: 999999, behavior: 'smooth' });
             return inner;
         }
 
@@ -601,29 +643,29 @@
 
         function updateConfigUI() {
             document.getElementById('config-data-dir').value = config.data_dir;
-            document.getElementById('config-provider').value = config.provider;
+            document.getElementById('config-provider').value  = config.provider;
+            document.getElementById('config-url').value       = config.base_url;
+            document.getElementById('config-key').value       = config.api_key;
+            document.getElementById('config-model').value     = config.model_name;
+            document.getElementById('config-embed').value     = config.embedding_model;
+            // Trigger hint update
+            onProviderChange(config.provider);
+            // But restore saved URL/key after onProviderChange overwrites them
             document.getElementById('config-url').value = config.base_url;
             document.getElementById('config-key').value = config.api_key;
-            document.getElementById('config-model').value = config.model_name;
-            document.getElementById('config-embed').value = config.embedding_model;
         }
 
         function saveSettings() {
-            const oldDir = config.data_dir;
-            config.data_dir = document.getElementById('config-data-dir').value.trim() || './protorag_storage';
-            config.provider = document.getElementById('config-provider').value;
-            config.base_url = document.getElementById('config-url').value;
-            config.api_key = document.getElementById('config-key').value;
-            config.model_name = document.getElementById('config-model').value;
-            config.embedding_model = document.getElementById('config-embed').value;
+            const oldDir      = config.data_dir;
+            config.data_dir   = document.getElementById('config-data-dir').value.trim() || './protorag_storage';
+            config.provider   = document.getElementById('config-provider').value;
+            config.base_url   = document.getElementById('config-url').value.trim();
+            config.api_key    = document.getElementById('config-key').value.trim();
+            config.model_name = document.getElementById('config-model').value.trim();
+            config.embedding_model = document.getElementById('config-embed').value.trim();
             
             localStorage.setItem('app_config', JSON.stringify(config));
-            
-            if (oldDir !== config.data_dir) {
-                // If directory changed, refresh the view
-                loadSessions();
-                loadSessionHistory(currentSessionId);
-            }
+            if (oldDir !== config.data_dir) { loadSessions(); loadSessionHistory(currentSessionId); }
             toggleSettingsModal();
         }
 

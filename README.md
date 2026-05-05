@@ -1,10 +1,7 @@
-Here is a simple, self-contained `README.md` you can use for this codebase:
-
-```markdown
 # protoRAG+
 
-protoRAG+ is a lightweight, local-first RAG (Retrieval-Augmented Generation) chat application.  
-It lets you upload documents, index them locally with Chroma, and chat with an LLM using those documents as context.  
+protoRAG+ is a lightweight, local-first RAG (Retrieval-Augmented Generation) chat application.
+It lets you upload documents, index them locally with Chroma, and chat with an LLM using those documents as context.
 The UI is served from a static `index.html`, and the backend is a FastAPI app in `backend.py`.
 
 ---
@@ -64,6 +61,28 @@ pip install -r requirements.txt
    - **Embedding Model**: name of the embedding model
 
 By default, data is stored under `./data` (configurable via `DEFAULT_DATA_DIR` env var).
+
+---
+
+## Secure LLM Inference over Tailscale
+
+You can expose your LLM server (e.g. Ollama or an OpenAI-compatible proxy) only on your Tailscale tailnet and point protoRAG+ at that private address.
+
+1. Install and log in to Tailscale on the machine running your LLM server.
+2. Run your LLM API bound to the Tailscale interface or localhost, for example for Ollama:
+
+   ```bash
+   OLLAMA_HOST=127.0.0.1:11434 ollama serve
+   ```
+
+3. From a Tailscale-connected client machine, find the server’s Tailscale IP or MagicDNS name, e.g. `100.x.y.z` or `llm-server.tailnet-name.ts.net`.
+4. In the protoRAG+ Settings modal on the client:
+
+   - **Provider**: `ollama` (or matching your server)
+   - **Base URL**: `http://llm-server.tailnet-name.ts.net:11434/v1` (or `http://100.x.y.z:11434/v1`)
+   - **API Key**: leave blank or dummy for Ollama, or set as required by your proxy.
+
+Only devices on your Tailscale tailnet will be able to reach the LLM endpoint, giving you a simple private network for secure inference.
 
 ---
 

@@ -18,7 +18,7 @@ app = FastAPI(title="Local Isolated RAG Chat API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost", "http://127.0.0.1", "http://localhost:8000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -26,6 +26,38 @@ app.add_middleware(
 
 DEFAULT_DATA_DIR = os.environ.get("DEFAULT_DATA_DIR", "./data")
 MAX_HISTORY_ENTRIES = 200
+
+
+# ---------------------------------------------------------------------------
+# Provider URL normalisation
+# ---------------------------------------------------------------------------
+# Rules (applied in order):
+#   1. Strip trailing slash.
+#   2. If the URL already ends with /v1  → use as-is (user was explicit).
+#   3. If provider is "ollama"           → append /v1  (Ollama native port
+#                                          exposes OpenAI-compat at /v1).
+#   4. If provider is "lmstudio"         → append /v1  (LM Studio default).
+#   5. All other providers (openai,
+#      litellm, custom, …)              → use as-is; the user's base_url
+#                                          is assumed to be the correct root.
+#
+# This means:
+#   • http://localhost:11434          (Ollama, no /v1)   → .../v1   ✓
+#   • http://localhost:11434/v1       (Ollama, explicit)  → .../v1   ✓  no dup
+#   • http://localhost:1234/v1        (LM Studio)         → .../v1   ✓
+#   • http://localhost:4000           (LiteLLM proxy)     → .../     ✓
+#   • https://api.openai.com/v1       (OpenAI)            → .../v1   ✓
+#   • http://my-server/anything       (custom)            → as given  ✓
+
+def normalise_base_url(provider: str, base_url: str) -> str:
+    url = base_url.rstrip("/")
+    if url.endswith("/v1"):
+        return url  # already correct – no matter the provider
+    provider_lower = provider.lower()
+    if provider_lower in ("ollama", "lmstudio"):
+        return url + "/v1"
+    # openai / litellm / custom: trust whatever the user supplied
+    return url
 
 
 def resolve_dirs(data_dir: Optional[str]):
@@ -65,11 +97,10 @@ class ChatRequest(BaseModel):
 
 
 def get_embeddings(config: ChatConfig):
-    base_url = config.base_url.rstrip("/")
-    if config.provider.lower() == "ollama" and not base_url.endswith("/v1"):
-        base_url += "/v1"
-
-    api_key = config.api_key if config.api_key else "dummy"
+    base_url = normalise_base_url(config.provider, config.base_url)
+    # Most local providers accept any non-empty string as the key.
+    # LiteLLM / OpenAI need a real key passed through; we preserve it.
+    api_key = config.api_key if config.api_key and config.api_key.strip() not in ("", "none", "None") else "dummy"
 
     return OpenAIEmbeddings(
         model=config.embedding_model,
@@ -80,11 +111,8 @@ def get_embeddings(config: ChatConfig):
 
 
 def get_llm(config: ChatConfig):
-    base_url = config.base_url.rstrip("/")
-    if config.provider.lower() == "ollama" and not base_url.endswith("/v1"):
-        base_url += "/v1"
-
-    api_key = config.api_key if config.api_key else "dummy"
+    base_url = normalise_base_url(config.provider, config.base_url)
+    api_key = config.api_key if config.api_key and config.api_key.strip() not in ("", "none", "None") else "dummy"
 
     return ChatOpenAI(
         model=config.model_name,
@@ -98,14 +126,12 @@ def load_document(file_path: str, filename: str):
     if filename.lower().endswith(".pdf"):
         try:
             from langchain_community.document_loaders import PyPDFLoader
-
             loader = PyPDFLoader(file_path)
             return loader.load()
         except ImportError:
             raise Exception("pypdf is required for PDF support. Run: pip install pypdf")
     else:
         from langchain_community.document_loaders import TextLoader
-
         loader = TextLoader(file_path, autodetect_encoding=True)
         return loader.load()
 
