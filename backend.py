@@ -5,7 +5,7 @@ import traceback
 from typing import List
 
 from fastapi import FastAPI, UploadFile, File, Form, Request
-from fastapi.responses import StreamingResponse, HTMLResponse
+from fastapi.responses import StreamingResponse, HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -268,6 +268,44 @@ def delete_session(session_id: str):
     if os.path.exists(doc_path): shutil.rmtree(doc_path)
     return {"status": "success"}
 
+@app.get("/api/sessions/{session_id}/documents/{filename}")
+def get_document(session_id: str, filename: str):
+    file_path = os.path.join(DOCS_DIR, session_id, filename)
+    if os.path.exists(file_path):
+        return FileResponse(file_path)
+    return {"status": "error", "message": "File not found"}
+
+@app.post("/api/sessions/{session_id}/documents/{filename}/delete")
+async def delete_document(session_id: str, filename: str, config: ChatConfig):
+    # 1. Delete the specific document
+    file_path = os.path.join(DOCS_DIR, session_id, filename)
+    if os.path.exists(file_path):
+        os.remove(file_path)
+        
+    # 2. Wipe the existing vector store for this session
+    db_path = os.path.join(DB_DIR, session_id, "chromadb")
+    if os.path.exists(db_path):
+        shutil.rmtree(db_path)
+        
+    # 3. Rebuild the vector store with any remaining documents
+    doc_path = os.path.join(DOCS_DIR, session_id)
+    if os.path.exists(doc_path):
+        remaining_files = os.listdir(doc_path)
+        if remaining_files:
+            embeddings = get_embeddings(config)
+            vectorstore = Chroma(
+                persist_directory=db_path,
+                embedding_function=embeddings,
+                collection_name=f"col_{session_id}"
+            )
+            for f in remaining_files:
+                fp = os.path.join(doc_path, f)
+                docs = load_document(fp, f)
+                text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+                splits = text_splitter.split_documents(docs)
+                vectorstore.add_documents(splits)
+                
+    return {"status": "success"}
 
 # Mount Frontend UI directly on the root
 @app.get("/")
@@ -281,6 +319,6 @@ def get_ui():
 if __name__ == "__main__":
     import uvicorn
     # Automatically run on standard port 8000 when executed as a script
-    print("🚀 Starting Local RAG Application...")
-    print("👉 Open http://localhost:8000 in your browser.")
+    print("Starting Local RAG Application...")
+    print("Open http://localhost:8000 in your browser.")
     uvicorn.run("backend:app", host="0.0.0.0", port=8000, reload=True)

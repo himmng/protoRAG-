@@ -191,25 +191,26 @@
                     <select id="config-provider" class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red">
                         <option value="openai">OpenAI</option>
                         <option value="ollama">Ollama</option>
+                        <option value="litellm">Litellm</option>
                     </select>
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-gray-400 uppercase mb-1">API Key</label>
-                    <input id="config-key" type="password" placeholder="Enter API key" class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red">
+                    <input id="config-key" type="password" placeholder="Enter API key e.g. sk-..." class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red">
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Model</label>
-                        <input id="config-model" type="text" value="gpt-4o" class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red">
+                        <input id="config-model" type="text" placeholder="e.g. gemma-4-e4b:latest" value="gpt-4o" class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red">
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Embedding</label>
-                        <input id="config-embed" type="text" value="text-embedding-3-small" class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red">
+                        <input id="config-embed" type="text" placeholder="e.g. embeddinggemma" value="text-embedding-3-small" class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red">
                     </div>
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Base URL</label>
-                    <input id="config-url" type="text" value="https://api.openai.com/v1" class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red">
+                    <input id="config-url" type="text" placeholder="e.g. http://localhost:11434/v1" value="https://api.openai.com/v1" class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red">
                 </div>
             </div>
             <div class="p-6 bg-gray-50 dark:bg-slate-800/50 flex justify-end">
@@ -221,11 +222,11 @@
     <script>
         let currentSessionId = localStorage.getItem('last_session_id') || crypto.randomUUID();
         const config = {
-            provider: 'openai',
-            base_url: 'https://api.openai.com/v1',
-            api_key: '',
-            model_name: 'gpt-4o',
-            embedding_model: 'text-embedding-3-small'
+            provider: 'ollama',
+            base_url: 'http://localhost:11434/v1',
+            api_key: 'none',
+            model_name: 'gemma-4-e4b:latest',
+            embedding_model: 'mxbai-embed:latest'
         };
 
         const savedConfig = localStorage.getItem('app_config');
