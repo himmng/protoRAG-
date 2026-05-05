@@ -2,7 +2,7 @@
   functions = "netlify/functions"
 [[redirects]]
   from = "/proxy-ai/*"
-  to = "https://radiation-temperature-june-establish.trycloudflare.com/:splat"
+  to = "https://my-ubuntu.tail8e3f2b.ts.net/"
   status = 200
   force = true
   headers = {X-From = "Netlify"}
