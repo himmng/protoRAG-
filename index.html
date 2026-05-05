@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>protoRAG⁺</title>
     <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 15C58 15 65 22 65 30C73 30 80 37 80 45C80 53 73 60 65 60C65 68 58 75 50 75C42 75 35 68 35 60C27 60 20 53 20 45C20 37 27 30 35 30C35 22 42 15 50 15Z' fill='%23CD5C5C'/%3E%3Ccircle cx='50' cy='45' r='8' fill='%23CD5C5C' stroke='white' stroke-width='2'/%3E%3C/svg%3E">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='20 15 60 60'%3E%3Cpath d='M50 15C58 15 65 22 65 30C73 30 80 37 80 45C80 53 73 60 65 60C65 68 58 75 50 75C42 75 35 68 35 60C27 60 20 53 20 45C20 37 27 30 35 30C35 22 42 15 50 15Z' fill='%23CD5C5C'/%3E%3Ccircle cx='50' cy='45' r='8' fill='%23CD5C5C' stroke='white' stroke-width='2'/%3E%3C/svg%3E">
     
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -110,18 +110,6 @@
         
         <div class="flex-1 overflow-y-auto px-3 space-y-1 py-2" id="session-list"></div>
         
-        <!-- Separated Upload Document Section -->
-        <div class="px-3 pb-3">
-            <button onclick="document.getElementById('file-input').click()" class="bottom-btn flex items-center gap-4 w-full p-2.5 rounded-xl text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-800 transition-all overflow-hidden">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                    <line x1="12" y1="13" x2="12" y2="17"></line>
-                    <line x1="10" y1="15" x2="14" y2="15"></line>
-                </svg>
-                <span class="nav-text text-sm font-medium">Upload Document</span>
-            </button>
-        </div>
 
         <!-- Settings Section -->
         <div class="p-3 border-t border-gray-200 dark:border-slate-800">
@@ -135,7 +123,7 @@
         </div>
     </aside>
 
-    <!-- Main -->
+    <!-- Main Section -->
     <main class="flex-1 flex flex-col h-full relative bg-white dark:bg-slate-950">
         <div class="absolute top-4 right-6 z-40 flex items-center gap-3">
             <button onclick="toggleDarkMode()" class="p-2.5 bg-white/80 dark:bg-slate-800/80 backdrop-blur border border-gray-200 dark:border-slate-700 rounded-full shadow-lg hover:scale-110 transition-all">
@@ -144,38 +132,79 @@
             </button>
         </div>
 
-        <!-- Floating Document Bar - Relocated to top left -->
-        <div id="floating-doc-bar" class="hidden absolute top-4 left-6 z-30 max-w-[calc(100%-120px)] transition-all duration-300">
-            <div class="bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border border-gray-200 dark:border-slate-700 rounded-2xl shadow-xl p-1.5 flex items-center gap-2">
-                <div class="flex flex-wrap gap-2 px-1 items-center max-h-32 overflow-y-auto" id="doc-pills">
-                    <!-- Pills dynamically added -->
+        <!-- Floating Document Bar - Wider with larger delete icons -->
+        <div id="floating-doc-bar" class="hidden absolute top-4 left-6 z-30 min-w-[320px] max-w-[calc(100%-180px)] transition-all duration-300">
+            <div class="bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border border-gray-200 dark:border-slate-700 rounded-2xl shadow-xl p-2 flex items-center gap-3">
+                
+                <div class="flex flex-wrap gap-2 px-1 items-center max-h-32 overflow-y-auto flex-1" id="doc-pills">
+                    <!-- Ensure your JS generates the delete SVG with width="18" and height="18" -->
                 </div>
-                <div class="h-5 w-px bg-gray-200 dark:bg-slate-700 mx-0.5 flex-shrink-0"></div>
-                <button onclick="document.getElementById('file-input').click()" class="flex-shrink-0 p-1 rounded-lg text-gray-400 hover:text-indian-red hover:bg-indian-red/10 transition-colors" title="Upload another document">
-                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+
+                <div class="h-6 w-px bg-gray-200 dark:bg-slate-700 flex-shrink-0"></div>
+
+                <button onclick="document.getElementById('file-input').click()" 
+                        class="flex-shrink-0 p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:text-indian-red hover:bg-indian-red/10 transition-colors">
+                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path d="M12 5v14M5 12h14"/>
+                    </svg>
                 </button>
             </div>
         </div>
 
+        <!-- Chat Area -->
         <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-8 pt-24">
-            <div class="max-w-3xl mx-auto space-y-6 pb-32" id="messages"></div>
+            <div class="max-w-3xl mx-auto space-y-6 pb-44" id="messages"></div>
         </div>
 
-        <input type="file" id="file-input" class="hidden" onchange="uploadFile(this.files[0])">
-        
-        <div class="absolute bottom-0 w-full bg-gradient-to-t from-white dark:from-slate-950 via-white dark:via-slate-950 to-transparent pt-12 pb-4 px-4">
-            <div class="max-w-3xl mx-auto">
-                <form id="chat-form" class="relative flex items-end bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-[2rem] shadow-2xl px-4 py-2 ring-1 ring-black/5">
-                    <textarea id="message-input" rows="1" placeholder="Type a message..." class="flex-1 max-h-48 py-3 px-2 bg-transparent outline-none resize-none text-gray-800 dark:text-slate-100" oninput="autoResizeTextArea(this)"></textarea>
-                    <button type="submit" class="p-2.5 bg-indian-red text-white rounded-full hover:scale-105 transition-all shadow-lg mb-1 flex-shrink-0">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+        <!-- Bottom Input Area - Expanded Width -->
+        <div class="fixed bottom-0 w-full bg-gradient-to-t from-white dark:from-slate-950 via-white dark:via-slate-950 to-transparent pt-12 pb-4 px-4">
+            <div class="max-w-6xl ml-4 md:ml-40"> <!-- Increased to 6xl for more width -->
+                
+                <div class="flex flex-col md:flex-row items-stretch md:items-end justify-start gap-3">
+                    
+                    <!-- Upload Button -->
+                    <button onclick="document.getElementById('file-input').click()" 
+                            class="group relative flex items-center justify-center gap-3 px-4 py-3 mb-1 bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-400 rounded-2xl border border-gray-300 dark:border-slate-700 shadow-sm min-w-[180px]">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="13" x2="12" y2="17"></line><line x1="10" y1="15" x2="14" y2="15"></line></svg>
+                        <span class="text-sm font-semibold whitespace-nowrap">Upload Document</span>
+                        
+                        <div class="relative flex items-center ml-1">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 dark:bg-slate-700 text-white text-[10px] rounded-lg shadow-xl z-50">
+                                <p class="font-bold mb-1 border-b border-gray-600 pb-1">Supported Formats:</p>
+                                <p>txt, csv, pdf, xlsx, pptx, json/l, yaml, etc.</p>
+                                <div class="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-gray-800 dark:border-t-slate-700"></div>
+                            </div>
+                        </div>
                     </button>
-                </form>
-                <div class="text-[10px] text-gray-400 dark:text-slate-600 text-center mt-2 px-4 select-none">
-                    Use <b>Shift+Enter</b> for new line. protoRAG⁺ can make mistakes.
+
+                    <!-- Chat Box (flex-1 expands to fill the 6xl space) -->
+                    <form id="chat-form" class="flex-1 relative flex items-end bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-[2rem] shadow-2xl px-4 py-2 ring-1 ring-black/5">
+                        <textarea id="message-input" rows="1" placeholder="Type a message..." 
+                                class="flex-1 max-h-48 py-3 px-2 bg-transparent outline-none resize-none text-gray-800 dark:text-slate-100" 
+                                oninput="autoResizeTextArea(this)"></textarea>
+                        
+                        <button type="submit" class="p-2.5 bg-indian-red text-white rounded-full hover:scale-105 transition-all shadow-lg mb-1 flex-shrink-0">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Spaced Helper Text -->
+                <div class="text-[11px] text-gray-500 dark:text-slate-400 text-left mt-2 px-20 select-none ml-[180px]">
+                    <div class="flex items-center gap-80"> 
+                        <span><b>Disclaimer:</b> protoRAG⁺ can make mistakes.</span>
+                        <span><b>Tip:</b> Use <b>Shift+Enter</b> for new line.</span>
+                    </div>
                 </div>
             </div>
         </div>
+
+
+
+
+<input type="file" id="file-input" class="hidden" onchange="uploadFile(this.files[0])">
+
     </main>
 
     <!-- Settings Modal -->
@@ -458,18 +487,19 @@
 
         function renderWelcome() {
             document.getElementById('messages').innerHTML = `
-                <div id="welcome-msg" class="text-center py-20 animate-fade-in">
-                    <div class="inline-flex items-center justify-center w-24 h-24 bg-indian-red/10 rounded-[2.5rem] mb-6">
+                <div id="welcome-msg" class="flex flex-col items-center justify-center min-h-[70vh] text-center animate-fade-in">
+                    <div class="inline-flex items-center justify-center w-24 h-24 bg-indian-red/10 rounded-[2.5rem] mb-6 shadow-sm">
                         <svg width="60" height="60" viewBox="0 0 100 100">
                             <path d="M50 15C58 15 65 22 65 30C73 30 80 37 80 45C80 53 73 60 65 60C65 68 58 75 50 75C42 75 35 68 35 60C27 60 20 53 20 45C20 37 27 30 35 30C35 22 42 15 50 15Z" fill="#CD5C5C"/>
                             <circle cx="50" cy="45" r="8" fill="#CD5C5C" stroke="white" stroke-width="2"/>
                         </svg>
                     </div>
-                    <h1 class="text-4xl font-black text-gray-800 dark:text-white mb-2">protoRAG⁺</h1>
-                    <p class="text-gray-500 dark:text-slate-400">Intelligent RAG with local isolation.</p>
+                    <h1 class="text-4xl font-black text-gray-800 dark:text-white mb-2 tracking-tight">protoRAG⁺</h1>
+                    <p class="text-gray-500 dark:text-slate-400 text-lg">Intelligent RAG with local isolation.</p>
                 </div>
             `;
         }
+
 
         function toggleSidebar() {
             const s = document.getElementById('sidebar');
