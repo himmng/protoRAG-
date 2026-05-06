@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>protoRAG⁺</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='20 15 60 60'%3E%3Cpath d='M50 15C58 15 65 22 65 30C73 30 80 37 80 45C80 53 73 60 65 60C65 68 58 75 50 75C42 75 35 68 35 60C27 60 20 53 20 45C20 37 27 30 35 30C35 22 42 15 50 15Z' fill='%23CD5C5C'/%3E%3Ccircle cx='50' cy='45' r='8' fill='%23CD5C5C' stroke='white' stroke-width='2'/%3E%3C/svg%3E">
-    
+
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
@@ -14,20 +14,16 @@
             darkMode: 'class',
             theme: {
                 extend: {
-                    colors: {
-                        'indian-red': '#CD5C5C',
-                    }
+                    colors: { 'indian-red': '#CD5C5C' }
                 }
             }
         }
     </script>
     <style>
         :root { --indian-red: #CD5C5C; }
-        
-        html {
-            font-size: clamp(14px, 1vw, 16px);
-            -webkit-text-size-adjust: 100%;
-        }
+
+        html { -webkit-text-size-adjust: 100%; }
+
         ::-webkit-scrollbar { width: 5px; height: 5px; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         .dark ::-webkit-scrollbar-thumb { background: #334155; }
@@ -36,40 +32,63 @@
             transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
         }
 
-        #sidebar { transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1); overflow: hidden; }
-        .sidebar-expanded { width: 280px; }
+        /* ── Sidebar transitions ───────────────────────────────────────── */
+        #sidebar {
+            transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                        transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .sidebar-expanded  { width: 280px; }
         .sidebar-collapsed { width: 72px; }
+
+        /* On mobile the sidebar slides in/out as an overlay */
+        @media (max-width: 767px) {
+            #sidebar {
+                position: fixed;
+                top: 0; left: 0; bottom: 0;
+                width: 280px !important;   /* always full width when open */
+                transform: translateX(-100%);
+                z-index: 40;
+            }
+            #sidebar.mobile-open { transform: translateX(0); }
+            #sidebar-backdrop {
+                display: none;
+                position: fixed; inset: 0;
+                background: rgba(0,0,0,0.45);
+                z-index: 39;
+            }
+            #sidebar.mobile-open ~ #sidebar-backdrop { display: block; }
+        }
 
         .logo-container { transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
         .sidebar-collapsed .logo-container { transform: rotate(180deg); }
-        
+
         .arrow-icon { transition: transform 0.4s ease; }
         .sidebar-collapsed .arrow-icon { transform: rotate(180deg); }
 
-        .nav-text { 
+        .nav-text {
             transition: opacity 0.2s ease, transform 0.2s ease;
             white-space: nowrap;
         }
         .sidebar-collapsed .nav-text { opacity: 0; transform: translateX(-10px); pointer-events: none; }
-        
+
         .sidebar-collapsed .new-chat-btn span { display: none; }
         .sidebar-collapsed .new-chat-btn { justify-content: center; padding: 10px; }
         .sidebar-collapsed .bottom-btn span { display: none; }
         .sidebar-collapsed .bottom-btn { justify-content: center; }
 
+        /* ── Animations ────────────────────────────────────────────────── */
         .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
         .animate-zoom-in { animation: zoomIn 0.2s ease-out forwards; }
         @keyframes zoomIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-        
+
         .animate-fade-out { animation: fadeOut 0.2s ease-out forwards; }
         @keyframes fadeOut { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.95); } }
 
-        @keyframes gear-rotate {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
+        @keyframes gear-rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .animate-gear { animation: gear-rotate 2.5s linear infinite; }
 
         .loading-dots:after {
@@ -78,9 +97,9 @@
         }
         @keyframes dots {
             0%, 20% { content: '.'; }
-            40% { content: '..'; }
-            60% { content: '...'; }
-            80%, 100% { content: ''; }
+            40%      { content: '..'; }
+            60%      { content: '...'; }
+            80%, 100%{ content: ''; }
         }
 
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -97,14 +116,120 @@
             display: inline-block;
             letter-spacing: 0.01em;
         }
-        .dark .provider-hint {
-            background: rgba(205,92,92,0.18);
+        .dark .provider-hint { background: rgba(205,92,92,0.18); }
+
+        /* ── Floating doc bar — always below the top-bar buttons ──────── */
+        #floating-doc-bar {
+            /* On desktop: top-left of main area. On mobile: full width below top bar. */
+            top: 4.5rem;
+        }
+        @media (max-width: 767px) {
+            #floating-doc-bar {
+                left: 0.75rem;
+                right: 4.5rem;   /* leave room for dark-mode toggle */
+                max-width: none;
+            }
+        }
+
+        /* ── Input area responsive fixes ──────────────────────────────── */
+        #input-wrapper {
+            width: 100%;
+            max-width: 56rem;
+            padding: 0 1rem;
+            box-sizing: border-box;
+        }
+        @media (min-width: 768px) {
+            #input-wrapper {
+                padding: 0 2rem;
+            }
+        }
+
+        /* Make the chat messages area use the full available width */
+        #chat-container { padding-bottom: 10rem; }
+
+        /* ── Mobile hamburger button ──────────────────────────────────── */
+        #mobile-menu-btn {
+            display: none;
+        }
+        @media (max-width: 767px) {
+            #mobile-menu-btn { display: flex; }
+            /* On mobile hide the desktop collapse arrows */
+            #desktop-toggle { display: none; }
+        }
+
+        /* ── @mention autocomplete popup ──────────────────────────────── */
+        #at-mention-popup {
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.13);
+            overflow: hidden;
+            z-index: 100;
+            animation: fadeIn 0.15s ease-out;
+            max-height: 220px;
+            overflow-y: auto;
+        }
+        .dark #at-mention-popup {
+            background: #1e293b;
+            border-color: #334155;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+        .at-mention-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            color: #374151;
+            border-bottom: 1px solid #f1f5f9;
+            transition: background 0.1s;
+        }
+        .dark .at-mention-item { color: #cbd5e1; border-bottom-color: #1e293b; }
+        .at-mention-item:last-child { border-bottom: none; }
+        .at-mention-item:hover, .at-mention-item.selected {
+            background: rgba(205,92,92,0.08);
+            color: #CD5C5C;
+        }
+        .dark .at-mention-item:hover, .dark .at-mention-item.selected {
+            background: rgba(205,92,92,0.15);
+        }
+        .at-mention-item .at-badge {
+            font-size: 10px;
+            font-weight: 700;
+            background: rgba(205,92,92,0.12);
+            color: #CD5C5C;
+            border-radius: 5px;
+            padding: 1px 6px;
+            letter-spacing: 0.03em;
+        }
+
+        /* ── @mention pill tags inside the textarea area ─────────────── */
+        .at-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(205,92,92,0.12);
+            color: #CD5C5C;
+            border-radius: 20px;
+            padding: 2px 8px 2px 6px;
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
         }
     </style>
 </head>
 <body class="bg-white dark:bg-slate-950 text-gray-900 dark:text-slate-100 font-sans h-screen flex overflow-hidden">
 
-    <!-- Sidebar -->
+    <!-- Mobile sidebar backdrop -->
+    <div id="sidebar-backdrop" onclick="closeMobileSidebar()"></div>
+
+    <!-- ── Sidebar ─────────────────────────────────────────────────────── -->
     <aside id="sidebar" class="sidebar-expanded relative z-30 h-full bg-gray-50 dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 flex flex-col shadow-sm">
         <div class="p-4 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between overflow-hidden">
             <div class="flex items-center gap-3 cursor-pointer" onclick="toggleSidebar()">
@@ -116,7 +241,7 @@
                 </div>
                 <span class="nav-text font-bold text-xl tracking-tight text-[#CD5C5C]">protoRAG⁺</span>
             </div>
-            <button onclick="toggleSidebar()" class="nav-text p-1.5 rounded-lg text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-800 transition-colors">
+            <button id="desktop-toggle" onclick="toggleSidebar()" class="nav-text p-1.5 rounded-lg text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-800 transition-colors">
                 <svg class="arrow-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="11 17 6 12 11 7"></polyline>
                     <polyline points="18 17 13 12 18 7"></polyline>
@@ -133,9 +258,9 @@
                 <span class="nav-text">New Chat</span>
             </button>
         </div>
-        
+
         <div class="flex-1 overflow-y-auto px-3 space-y-1 py-2" id="session-list"></div>
-        
+
         <div class="p-3 border-t border-gray-200 dark:border-slate-800">
             <button onclick="toggleSettingsModal()" class="bottom-btn flex items-center gap-4 w-full p-2.5 rounded-xl text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-800 transition-all overflow-hidden group">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0 group-hover:rotate-90 transition-transform duration-500">
@@ -147,23 +272,30 @@
         </div>
     </aside>
 
-    <!-- Main Section -->
-    <main class="flex-1 flex flex-col h-full relative bg-white dark:bg-slate-950">
-        <div class="absolute top-4 right-6 z-40 flex items-center gap-3">
+    <!-- ── Main ────────────────────────────────────────────────────────── -->
+    <main class="flex-1 flex flex-col h-full relative bg-white dark:bg-slate-950 min-w-0">
+
+        <!-- Top-right controls -->
+        <div class="absolute top-3 right-4 z-40 flex items-center gap-2">
             <button onclick="toggleDarkMode()" class="p-2.5 bg-white/80 dark:bg-slate-800/80 backdrop-blur border border-gray-200 dark:border-slate-700 rounded-full shadow-lg hover:scale-110 transition-all">
                 <svg id="theme-sun" class="block dark:hidden text-orange-500" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
                 <svg id="theme-moon" class="hidden dark:block text-blue-400" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
             </button>
         </div>
 
+        <!-- Mobile hamburger -->
+        <button id="mobile-menu-btn" onclick="openMobileSidebar()" class="absolute top-3 left-4 z-40 p-2.5 bg-white/80 dark:bg-slate-800/80 backdrop-blur border border-gray-200 dark:border-slate-700 rounded-full shadow-lg hover:scale-110 transition-all items-center justify-center">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+
         <!-- Floating Document Bar -->
-        <div id="floating-doc-bar" class="hidden absolute top-4 left-6 z-30 min-w-[320px] max-w-[calc(100%-180px)] transition-all duration-300">
-            <div class="bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border border-gray-200 dark:border-slate-700 rounded-2xl shadow-xl p-2 flex items-center gap-3">
-                <div class="flex flex-wrap gap-2 px-1 items-center max-h-32 overflow-y-auto flex-1" id="doc-pills"></div>
+        <div id="floating-doc-bar" class="hidden absolute left-4 z-30 min-w-[260px] max-w-[calc(100%-5rem)] transition-all duration-300">
+            <div class="bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border border-gray-200 dark:border-slate-700 rounded-2xl shadow-xl p-2 flex items-center gap-2">
+                <div class="flex flex-col gap-2 px-1 items-stretch max-h-36 overflow-y-auto flex-1" id="doc-pills"></div>
                 <div class="h-6 w-px bg-gray-200 dark:bg-slate-700 flex-shrink-0"></div>
-                <button onclick="document.getElementById('file-input').click()" 
-                        class="flex-shrink-0 p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:text-indian-red hover:bg-indian-red/10 transition-colors">
-                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                <button onclick="document.getElementById('file-input').click()"
+                        class="flex-shrink-0 p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:text-indian-red hover:bg-indian-red/10 transition-colors" title="Add document">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                         <path d="M12 5v14M5 12h14"/>
                     </svg>
                 </button>
@@ -171,44 +303,50 @@
         </div>
 
         <!-- Chat Area -->
-        <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-8 pt-24">
-            <div class="max-w-3xl mx-auto space-y-20 pb-40" id="messages"></div>
+        <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-8 pt-20">
+            <div class="max-w-3xl mx-auto space-y-20 pb-44" id="messages"></div>
         </div>
 
-        <!-- Bottom Input Area -->
-        <div class="fixed bottom-0 w-full bg-gradient-to-t from-white dark:from-slate-950 via-white dark:via-slate-950 to-transparent pt-12 pb-4 px-4">
-            <div class="max-w-4xl ml-4 md:ml-40"> 
-                <div class="flex flex-col md:flex-row items-stretch md:items-end justify-start gap-3">
-                    <button onclick="document.getElementById('file-input').click()" 
-                            class="group relative flex items-center justify-center gap-3 px-4 py-3 mb-1 bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-400 rounded-2xl border border-gray-300 dark:border-slate-700 shadow-sm min-w-[180px] hover:text-indian-red hover:border-indian-red/50 transition-colors">
+        <!-- Bottom Input Area — fully responsive -->
+        <div class="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-white dark:from-slate-950 via-white/95 dark:via-slate-950/95 to-transparent pt-8 pb-safe pb-4 z-20"
+             style="padding-bottom: max(1rem, env(safe-area-inset-bottom));">
+            <div id="input-wrapper" class="mx-auto">
+
+                <!-- Row: upload button + textarea -->
+                <div class="flex items-end gap-2">
+
+                    <!-- Upload button — icon-only on mobile, label on md+ -->
+                    <button onclick="document.getElementById('file-input').click()"
+                            class="group relative flex-shrink-0 flex items-center justify-center gap-2 px-3 md:px-4 py-3 mb-1 bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-400 rounded-2xl border border-gray-300 dark:border-slate-700 shadow-sm hover:text-indian-red hover:border-indian-red/50 transition-colors"
+                            title="Upload Document">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="13" x2="12" y2="17"></line><line x1="10" y1="15" x2="14" y2="15"></line></svg>
-                        <span class="text-sm font-semibold whitespace-nowrap">Upload Document</span>
-                        <div class="relative flex items-center ml-1">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 dark:bg-slate-700 text-white text-[10px] rounded-lg shadow-xl z-50">
-                                <p class="font-bold mb-1 border-b border-gray-600 pb-1">Supported Formats:</p>
-                                <p>txt, csv, pdf, xlsx, pptx, json, yaml, etc.</p>
-                                <div class="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-gray-800 dark:border-t-slate-700"></div>
-                            </div>
+                        <span class="hidden md:inline text-sm font-semibold whitespace-nowrap">Upload Doc</span>
+                        <!-- Tooltip -->
+                        <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-44 p-2 bg-gray-800 dark:bg-slate-700 text-white text-[10px] rounded-lg shadow-xl z-50 pointer-events-none">
+                            <p class="font-bold mb-1 border-b border-gray-600 pb-1">Supported Formats:</p>
+                            <p>txt, csv, pdf, json, yaml, etc.</p>
+                            <div class="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-gray-800 dark:border-t-slate-700"></div>
                         </div>
                     </button>
 
-                    <form id="chat-form" class="flex-1 relative flex items-end bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-[2rem] shadow-2xl px-4 py-2 ring-1 ring-black/5">
-                        <textarea id="message-input" rows="1" placeholder="Type a message..." 
-                                class="flex-1 max-h-48 py-3 px-2 bg-transparent outline-none resize-none text-gray-800 dark:text-slate-100" 
-                                oninput="autoResizeTextArea(this)"></textarea>
-                        
+                    <!-- Textarea form -->
+                    <form id="chat-form" class="flex-1 relative flex items-end bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-[2rem] shadow-2xl px-4 py-2 ring-1 ring-black/5 min-w-0">
+                        <!-- @mention autocomplete popup -->
+                        <div id="at-mention-popup" class="hidden"></div>
+                        <textarea id="message-input" rows="1" placeholder="Message… use @filename.pdf to target a document"
+                                  class="flex-1 max-h-48 py-3 px-2 bg-transparent outline-none resize-none text-gray-800 dark:text-slate-100 text-sm md:text-base"
+                                  oninput="autoResizeTextArea(this); handleAtMention(this);"
+                                  onkeydown="handleAtMentionKey(event)"></textarea>
                         <button type="submit" class="p-2.5 bg-indian-red text-white rounded-full hover:scale-105 transition-all shadow-lg mb-1 flex-shrink-0">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                         </button>
                     </form>
                 </div>
 
-                <div class="text-[11px] text-gray-500 dark:text-slate-400 text-left mt-2 px-20 select-none ml-[180px] hidden md:block">
-                    <div class="flex items-center justify-between"> 
-                        <span><b>Disclaimer:</b> protoRAG⁺ can make mistakes.</span>
-                        <span><b>Tip:</b> Use <b>Shift+Enter</b> for new line.</span>
-                    </div>
+                <!-- Disclaimer — hidden on mobile to save space -->
+                <div class="hidden md:flex items-center justify-between text-[11px] text-gray-500 dark:text-slate-400 mt-2 px-2 select-none">
+                    <span><b>Disclaimer:</b> protoRAG⁺ can make mistakes.</span>
+                    <span>Type <b>@filename</b> to target a document &nbsp;·&nbsp; <b>Shift+Enter</b> for new line</span>
                 </div>
             </div>
         </div>
@@ -216,7 +354,7 @@
         <input type="file" id="file-input" class="hidden" onchange="uploadFile(this.files[0])">
     </main>
 
-    <!-- Settings Modal -->
+    <!-- ── Settings Modal ──────────────────────────────────────────────── -->
     <div id="settings-modal" class="hidden fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg shadow-2xl border border-gray-200 dark:border-slate-800 overflow-hidden animate-zoom-in">
             <div class="p-6 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center">
@@ -226,28 +364,14 @@
                 </div>
                 <button onclick="toggleSettingsModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl font-light">&times;</button>
             </div>
-            
+
             <div class="p-6 space-y-5 max-h-[70vh] overflow-y-auto no-scrollbar">
 
-                <!-- ── CHANGE 1: Backend URL field (new) ── -->
+                <!-- Remote URL -->
                 <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
                     <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Remote URL (Leave blank when running locally)</label>
                     <input id="config-backend" type="text" placeholder="use tailscale, cloudflared (blank = same origin)" class="w-full bg-white dark:bg-slate-800 p-3 rounded-xl outline-none border border-gray-200 dark:border-slate-700 focus:border-indian-red transition-all font-mono text-xs">
                     <div class="text-[10px] text-gray-400 mt-1">Your tailscale, cloudflared tunnel for remote backend.</div>
-                </div>
-
-                <!-- Data Directory -->
-                <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
-                    <div class="flex items-center justify-between mb-2">
-                        <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider">Storage Path (Documents+VectorDB)</label>
-                        <div class="group relative">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-gray-400 cursor-help"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                            <div class="absolute bottom-full right-0 mb-2 hidden group-hover:block w-64 p-3 bg-gray-800 text-white text-[10px] rounded-xl shadow-2xl z-50 normal-case leading-relaxed">
-                                Path where documents, embeddings, and database indexes are stored.
-                            </div>
-                        </div>
-                    </div>
-                    <input id="config-data-dir" type="text" placeholder="e.g. /home/user/protorag_data" class="w-full bg-white dark:bg-slate-800 p-3 rounded-xl outline-none border border-gray-200 dark:border-slate-700 focus:border-indian-red transition-all font-mono text-xs">
                 </div>
 
                 <!-- Provider & Key -->
@@ -293,20 +417,22 @@
                 <!-- Provider cheat-sheet -->
                 <div class="bg-gray-50 dark:bg-slate-800/40 rounded-2xl border border-gray-100 dark:border-slate-800 p-4">
                     <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3">Provider quick-reference</p>
-                    <table class="w-full text-[11px] text-gray-500 dark:text-slate-400">
-                        <thead><tr class="border-b border-gray-200 dark:border-slate-700">
-                            <th class="text-left pb-1 font-bold">Provider</th>
-                            <th class="text-left pb-1 font-bold">Default base URL</th>
-                            <th class="text-left pb-1 font-bold">API key</th>
-                        </tr></thead>
-                        <tbody class="space-y-1 font-mono">
-                            <tr><td class="py-1 pr-2">Ollama</td><td class="py-1 pr-2">http://localhost:11434</td><td class="py-1">none</td></tr>
-                            <tr><td class="py-1 pr-2">LM Studio</td><td class="py-1 pr-2">http://localhost:1234</td><td class="py-1">lm-studio</td></tr>
-                            <tr><td class="py-1 pr-2">LiteLLM</td><td class="py-1 pr-2">http://localhost:4000</td><td class="py-1">any</td></tr>
-                            <tr><td class="py-1 pr-2">OpenAI</td><td class="py-1 pr-2">https://api.openai.com/v1</td><td class="py-1">sk-…</td></tr>
-                            <tr><td class="py-1 pr-2">Custom</td><td class="py-1 pr-2">your endpoint</td><td class="py-1">as needed</td></tr>
-                        </tbody>
-                    </table>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-[11px] text-gray-500 dark:text-slate-400 min-w-[360px]">
+                            <thead><tr class="border-b border-gray-200 dark:border-slate-700">
+                                <th class="text-left pb-1 font-bold">Provider</th>
+                                <th class="text-left pb-1 font-bold">Default base URL</th>
+                                <th class="text-left pb-1 font-bold">API key</th>
+                            </tr></thead>
+                            <tbody class="font-mono">
+                                <tr><td class="py-1 pr-2">Ollama</td><td class="py-1 pr-2">http://localhost:11434</td><td class="py-1">none</td></tr>
+                                <tr><td class="py-1 pr-2">LM Studio</td><td class="py-1 pr-2">http://localhost:1234</td><td class="py-1">lm-studio</td></tr>
+                                <tr><td class="py-1 pr-2">LiteLLM</td><td class="py-1 pr-2">http://localhost:4000</td><td class="py-1">any</td></tr>
+                                <tr><td class="py-1 pr-2">OpenAI</td><td class="py-1 pr-2">https://api.openai.com/v1</td><td class="py-1">sk-…</td></tr>
+                                <tr><td class="py-1 pr-2">Custom</td><td class="py-1 pr-2">your endpoint</td><td class="py-1">as needed</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                     <p class="text-[10px] text-gray-400 mt-3">
                         ℹ️ You don't need to add <code class="bg-gray-200 dark:bg-slate-700 px-1 rounded">/v1</code> for Ollama or LM Studio — the backend appends it automatically.
                     </p>
@@ -326,9 +452,8 @@
             lmstudio: { base_url: 'http://localhost:1234',  api_key: 'lm-studio', hint: 'Auto-appends /v1 · LM Studio server mode' },
             openai:   { base_url: 'https://api.openai.com/v1', api_key: '',       hint: 'Include /v1 in URL · real API key required' },
             litellm:  { base_url: 'http://localhost:4000',  api_key: 'any',       hint: 'Proxy root · /v1 added by LiteLLM automatically' },
-            custom:   { base_url: '',                       api_key: '',           hint: 'Use the exact endpoint your server expects' },
+            custom:   { base_url: '',                        api_key: '',          hint: 'Use the exact endpoint your server expects' },
         };
-
         const URL_HINTS = {
             ollama:   'e.g. http://localhost:11434 or your tailscale/cloudflared URL',
             lmstudio: 'e.g. http://localhost:1234',
@@ -340,8 +465,7 @@
         let currentSessionId = localStorage.getItem('last_session_id') || crypto.randomUUID();
 
         const config = {
-            backend_url:     '',                   // ── CHANGE 2: added backend_url ──
-            data_dir:        './protorag_storage',
+            backend_url:     '',
             provider:        'ollama',
             base_url:        'http://localhost:11434',
             api_key:         'none',
@@ -349,20 +473,35 @@
             embedding_model: 'embeddinggemma:latest',
         };
 
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         const savedConfig = localStorage.getItem('app_config');
         if (savedConfig) Object.assign(config, JSON.parse(savedConfig));
 
-        // ── CHANGE 3: api() helper — all fetch calls go through this ──
-        // Falls back to relative URLs when backend_url is empty (local dev).
         function api(path) {
             return (config.backend_url || '').replace(/\/$/, '') + path;
+        }
+
+        /* ── Mobile sidebar helpers ─────────────────────────────────────── */
+        function openMobileSidebar() {
+            document.getElementById('sidebar').classList.add('mobile-open');
+        }
+        function closeMobileSidebar() {
+            document.getElementById('sidebar').classList.remove('mobile-open');
         }
 
         document.addEventListener('DOMContentLoaded', () => {
             loadSessions();
             loadSessionHistory(currentSessionId);
             updateConfigUI();
-            
+
             const msgInput = document.getElementById('message-input');
             msgInput.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -370,12 +509,121 @@
                     document.getElementById('chat-form').requestSubmit();
                 }
             });
+
+            // Close mobile sidebar when a session is tapped
+            document.getElementById('session-list').addEventListener('click', () => {
+                if (window.innerWidth < 768) closeMobileSidebar();
+            });
         });
 
         function autoResizeTextArea(el) {
             el.style.height = '48px';
             el.style.height = el.scrollHeight + 'px';
         }
+
+        /* ── @mention autocomplete ──────────────────────────────────────── */
+        // Tracks docs available in the current session
+        let sessionDocs = [];
+        let atMentionActive = false;
+        let atMentionStart = -1;
+        let atSelectedIdx = 0;
+
+        function setSessionDocs(docs) {
+            sessionDocs = docs || [];
+        }
+
+        function handleAtMention(textarea) {
+            const val = textarea.value;
+            const pos = textarea.selectionStart;
+
+            // Find the @ that's closest to and before the cursor
+            let searchFrom = pos - 1;
+            let atPos = -1;
+            while (searchFrom >= 0) {
+                if (val[searchFrom] === '@') { atPos = searchFrom; break; }
+                if (val[searchFrom] === ' ' || val[searchFrom] === '\n') break;
+                searchFrom--;
+            }
+
+            if (atPos === -1) { hideAtPopup(); return; }
+
+            const typed = val.slice(atPos + 1, pos).toLowerCase();
+            const matches = sessionDocs.filter(d => d.toLowerCase().includes(typed));
+
+            if (matches.length === 0) { hideAtPopup(); return; }
+
+            atMentionActive = true;
+            atMentionStart  = atPos;
+            atSelectedIdx   = 0;
+            renderAtPopup(matches);
+        }
+
+        function renderAtPopup(matches) {
+            const popup = document.getElementById('at-mention-popup');
+            popup.innerHTML = matches.map((d, i) => {
+                const ext = d.split('.').pop().toUpperCase();
+                const extColors = { PDF: 'text-red-500', DOCX: 'text-blue-500', TXT: 'text-slate-500', CSV: 'text-emerald-600' };
+                const col = extColors[ext] || 'text-indian-red';
+                const esc = escapeHtml(d);
+                return `<div class="at-mention-item ${i === 0 ? 'selected' : ''}" data-idx="${i}" data-filename="${esc}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="${col} flex-shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                    <span class="truncate flex-1">${esc}</span>
+                    <span class="at-badge">${escapeHtml(ext)}</span>
+                </div>`;
+            }).join('');
+            popup.querySelectorAll('.at-mention-item').forEach(el => {
+                el.addEventListener('mousedown', () => insertAtMention(el.dataset.filename));
+            });
+            popup.classList.remove('hidden');
+        }
+
+        function hideAtPopup() {
+            atMentionActive = false;
+            document.getElementById('at-mention-popup').classList.add('hidden');
+        }
+
+        function handleAtMentionKey(e) {
+            if (!atMentionActive) return;
+            const popup = document.getElementById('at-mention-popup');
+            const items = popup.querySelectorAll('.at-mention-item');
+            if (items.length === 0) return;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                atSelectedIdx = Math.min(atSelectedIdx + 1, items.length - 1);
+                items.forEach((el, i) => el.classList.toggle('selected', i === atSelectedIdx));
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                atSelectedIdx = Math.max(atSelectedIdx - 1, 0);
+                items.forEach((el, i) => el.classList.toggle('selected', i === atSelectedIdx));
+            } else if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                const sel = items[atSelectedIdx];
+                if (sel) insertAtMention(sel.dataset.filename);
+            } else if (e.key === 'Escape') {
+                hideAtPopup();
+            }
+        }
+
+        function insertAtMention(filename) {
+            const textarea = document.getElementById('message-input');
+            const val = textarea.value;
+            const pos = textarea.selectionStart;
+            // Replace from the @ up to the cursor with @filename + space
+            const before = val.slice(0, atMentionStart);
+            const after  = val.slice(pos);
+            textarea.value = before + '@' + filename + ' ' + after;
+            const newPos = atMentionStart + filename.length + 2;
+            textarea.setSelectionRange(newPos, newPos);
+            textarea.focus();
+            hideAtPopup();
+            autoResizeTextArea(textarea);
+        }
+
+        // Close popup when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#chat-form')) hideAtPopup();
+        });
 
         function onProviderChange(provider) {
             const defaults = PROVIDER_DEFAULTS[provider] || PROVIDER_DEFAULTS.custom;
@@ -392,57 +640,68 @@
 
         async function loadSessions() {
             try {
-                // ── CHANGE 4: all fetch calls now use api() ──
-                const res = await fetch(api(`/api/sessions?data_dir=${encodeURIComponent(config.data_dir)}`));
+                const res  = await fetch(api('/api/sessions'));
                 const data = await res.json();
                 const list = document.getElementById('session-list');
-                
+
                 const ragIcon  = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><circle cx="10" cy="13" r="2"></circle><line x1="12" y1="15" x2="14" y2="17"></line></svg>`;
                 const chatIcon = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
 
                 list.innerHTML = (data.sessions || []).map(s => `
-                    <div class="group relative flex items-center p-2.5 rounded-xl text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-800 cursor-pointer ${s.id === currentSessionId ? 'bg-gray-200/50 dark:bg-slate-800/50 active-session' : ''}" onclick="switchSession('${s.id}')">
-                        <div class="flex-shrink-0 transition-colors ${s.id === currentSessionId ? 'text-indian-red' : ''}">
+                    <div class="group relative flex items-center p-2.5 rounded-xl text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-800 cursor-pointer ${s.id === currentSessionId ? 'bg-gray-200/50 dark:bg-slate-800/50' : ''}" data-sid="${escapeHtml(s.id)}">
+                        <div class="flex-shrink-0 ${s.id === currentSessionId ? 'text-indian-red' : ''}">
                             ${s.is_rag ? ragIcon : chatIcon}
                         </div>
-                        <span class="nav-text ml-4 text-sm truncate flex-1 pr-6">${s.preview || 'Untitled Chat'}</span>
-                        <button onclick="event.stopPropagation(); deleteSession('${s.id}')" class="absolute right-2 opacity-0 group-hover:opacity-100 p-1.5 hover:text-red-500 transition-all rounded-lg hover:bg-white dark:hover:bg-slateify-700">
+                        <span class="nav-text ml-4 text-sm truncate flex-1 pr-6">${escapeHtml(s.preview || 'Untitled Chat')}</span>
+                        <button data-del="${escapeHtml(s.id)}" class="absolute right-2 opacity-0 group-hover:opacity-100 p-1.5 hover:text-red-500 transition-all rounded-lg hover:bg-white dark:hover:bg-slate-700">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                         </button>
                     </div>
                 `).join('');
+                list.querySelectorAll('[data-sid]').forEach(el => {
+                    el.addEventListener('click', () => switchSession(el.dataset.sid));
+                });
+                list.querySelectorAll('[data-del]').forEach(el => {
+                    el.addEventListener('click', (e) => { e.stopPropagation(); deleteSession(el.dataset.del); });
+                });
             } catch (e) { console.error(e); }
         }
 
+        /* ── Document bar ───────────────────────────────────────────────── */
         function updateDocBar(docs) {
+            setSessionDocs(docs);   // keep @mention autocomplete in sync
             const bar   = document.getElementById('floating-doc-bar');
             const pills = document.getElementById('doc-pills');
             if (!docs || docs.length === 0) { bar.classList.add('hidden'); return; }
             bar.classList.remove('hidden');
 
             const getFileIcon = (filename) => {
-                const ext = filename.split('.').pop().toLowerCase();
+                const ext = (filename.split('.').pop() || '').toLowerCase();
                 const colors = { pdf: 'text-red-500', xlsx: 'text-emerald-600', csv: 'text-emerald-600', xls: 'text-emerald-600', doc: 'text-blue-600', docx: 'text-blue-600', txt: 'text-slate-500' };
-                return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${colors[ext] || 'text-indian-red'} flex-shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>`;
+                return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${colors[ext] || 'text-indian-red'} flex-shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>`;
             };
 
-            pills.style.display       = 'flex';
-            pills.style.flexDirection = 'column';
-            pills.style.gap           = '8px';
-
-            pills.innerHTML = docs.map(d => `
-                <div class="flex items-center justify-between gap-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2.5 rounded-xl text-[12px] font-semibold text-slate-600 dark:text-slate-300 shadow-sm group hover:border-indian-red/30 transition-colors animate-fade-in w-full box-border">
-                    <div class="flex items-center gap-2 overflow-hidden flex-1 cursor-pointer" onclick="openDocModal('${d}')">
+            pills.innerHTML = docs.map(d => {
+                const esc = escapeHtml(d);
+                return `<div class="flex items-center justify-between gap-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-2 rounded-xl text-[11px] font-semibold text-slate-600 dark:text-slate-300 shadow-sm group hover:border-indian-red/30 transition-colors animate-fade-in w-full box-border">
+                    <div class="flex items-center gap-2 overflow-hidden flex-1 cursor-pointer doc-open" data-filename="${esc}">
                         ${getFileIcon(d)}
-                        <span class="truncate hover:text-indian-red transition-colors" title="Inspect ${d}">${d}</span>
+                        <span class="truncate hover:text-indian-red transition-colors" title="${esc}">${esc}</span>
                     </div>
-                    <button onclick="deleteDocument('${d}', event)" class="flex-shrink-0 p-1 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all flex items-center justify-center">
-                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    <button class="flex-shrink-0 p-1 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all flex items-center justify-center doc-del" data-filename="${esc}" title="Remove ${esc}">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
                     </button>
-                </div>
-            `).join('');
+                </div>`;
+            }).join('');
+            pills.querySelectorAll('.doc-open').forEach(el => {
+                el.addEventListener('click', () => openDocModal(el.dataset.filename));
+            });
+            pills.querySelectorAll('.doc-del').forEach(el => {
+                el.addEventListener('click', (e) => deleteDocument(el.dataset.filename, e));
+            });
         }
 
+        /* ── Document inspection modal ──────────────────────────────────── */
         function openDocModal(filename) {
             if (!currentSessionId) return;
             const existing = document.getElementById('doc-modal-overlay');
@@ -453,8 +712,8 @@
             overlay.className = 'fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 md:p-10 animate-fade-in';
             overlay.onclick = (e) => { if (e.target === overlay) closeDocModal(); };
 
-            const fileUrl = api(`/api/sessions/${currentSessionId}/documents/${encodeURIComponent(filename)}?data_dir=${encodeURIComponent(config.data_dir)}`);
-            const ext = filename.split('.').pop().toLowerCase();
+            const fileUrl = api(`/api/sessions/${currentSessionId}/documents/${encodeURIComponent(filename)}`);
+            const ext = (filename.split('.').pop() || '').toLowerCase();
 
             overlay.innerHTML = `
                 <div class="relative w-full max-w-5xl h-[85vh] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden animate-zoom-in">
@@ -464,7 +723,7 @@
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
                             </div>
                             <div>
-                                <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100 truncate max-w-[200px] md:max-w-md">${filename}</h3>
+                                <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100 truncate max-w-[160px] md:max-w-md">${filename}</h3>
                                 <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Document Inspection</p>
                             </div>
                         </div>
@@ -505,21 +764,25 @@
 
         async function deleteDocument(filename, e) {
             if (e) e.stopPropagation();
-            if (!confirm(`Delete ${filename}?`)) return;
+            if (!confirm(`Remove "${filename}" from this session?\n\nIts vectors will be deleted from the RAG index immediately.`)) return;
             try {
-                const res = await fetch(api(`/api/sessions/${currentSessionId}/documents/${encodeURIComponent(filename)}/delete`), {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(config)
-                });
-                if (res.ok) await loadSessionHistory(currentSessionId);
-            } catch (err) { alert("Failed to delete."); }
+                const res = await fetch(
+                    api(`/api/sessions/${currentSessionId}/documents/${encodeURIComponent(filename)}`),
+                    { method: 'DELETE' }
+                );
+                if (res.ok) {
+                    await loadSessionHistory(currentSessionId);
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    alert(`Delete failed: ${err.detail || res.statusText}`);
+                }
+            } catch (err) { alert(`Failed to delete: ${err.message}`); }
         }
 
         async function deleteSession(sid) {
-            if (!confirm('Delete this session?')) return;
+            if (!confirm('Delete this session and all its documents?')) return;
             try {
-                await fetch(api(`/api/sessions/${sid}?data_dir=${encodeURIComponent(config.data_dir)}`), { method: 'DELETE' });
+                await fetch(api(`/api/sessions/${sid}`), { method: 'DELETE' });
                 if (sid === currentSessionId) createNewSession();
                 else loadSessions();
             } catch (e) { console.error(e); }
@@ -528,14 +791,16 @@
         async function loadSessionHistory(sid) {
             currentSessionId = sid;
             localStorage.setItem('last_session_id', sid);
-            const res  = await fetch(api(`/api/sessions/${sid}?data_dir=${encodeURIComponent(config.data_dir)}`));
-            const data = await res.json();
-            const container = document.getElementById('messages');
-            container.innerHTML = '';
-            if (!data.history || data.history.length === 0) renderWelcome();
-            else data.history.forEach(msg => appendMessage(msg.role, msg.content));
-            updateDocBar(data.documents || []);
-            loadSessions();
+            try {
+                const res  = await fetch(api(`/api/sessions/${sid}`));
+                const data = await res.json();
+                const container = document.getElementById('messages');
+                container.innerHTML = '';
+                if (!data.history || data.history.length === 0) renderWelcome();
+                else data.history.forEach(msg => appendMessage(msg.role, msg.content));
+                updateDocBar(data.documents || []);
+                loadSessions();
+            } catch (e) { console.error(e); }
         }
 
         function createNewSession() {
@@ -551,18 +816,26 @@
 
         async function uploadFile(file) {
             if (!file) return;
+            // Reset file input so the same file can be re-uploaded
+            document.getElementById('file-input').value = '';
+
             const formData = new FormData();
             formData.append('file', file);
             formData.append('session_id', currentSessionId);
-            for (const key in config) { formData.append(key, config[key]); }
+            // Explicitly append each config field (not the backend_url)
+            formData.append('provider',        config.provider);
+            formData.append('base_url',        config.base_url);
+            formData.append('api_key',         config.api_key);
+            formData.append('model_name',      config.model_name);
+            formData.append('embedding_model', config.embedding_model);
 
-            appendMessage('assistant', `Indexing **${file.name}**...`);
+            appendMessage('assistant', `Indexing **${file.name}**…`);
             try {
                 const res    = await fetch(api('/api/upload'), { method: 'POST', body: formData });
                 const result = await res.json();
                 appendMessage('assistant', result.message);
                 await loadSessionHistory(currentSessionId);
-            } catch (e) { appendMessage('assistant', `Upload failed: ${e.message}`); }
+            } catch (err) { appendMessage('assistant', `Upload failed: ${err.message}`); }
         }
 
         document.getElementById('chat-form').onsubmit = async (e) => {
@@ -575,7 +848,7 @@
             input.style.height = '48px';
             document.getElementById('welcome-msg')?.remove();
             appendMessage('user', msg);
-            
+
             const assistantMsgDiv = appendMessage('assistant', `
                 <div class="flex items-center gap-3">
                     <svg width="24" height="24" viewBox="0 0 100 100" class="animate-gear flex-shrink-0">
@@ -591,7 +864,17 @@
                 const response = await fetch(api('/api/chat'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ session_id: currentSessionId, message: msg, config })
+                    body: JSON.stringify({
+                        session_id: currentSessionId,
+                        message: msg,
+                        config: {
+                            provider:        config.provider,
+                            base_url:        config.base_url,
+                            api_key:         config.api_key,
+                            model_name:      config.model_name,
+                            embedding_model: config.embedding_model,
+                        }
+                    })
                 });
 
                 const reader  = response.body.getReader();
@@ -600,23 +883,21 @@
                 while (true) {
                     const { value, done } = await reader.read();
                     if (done) break;
-                    const chunk = decoder.decode(value);
-                    const lines = chunk.split('\n');
+                    const lines = decoder.decode(value).split('\n');
                     for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            const dataStr = line.slice(6);
-                            if (dataStr === '[DONE]') break;
-                            try {
-                                const parsed = JSON.parse(dataStr);
-                                if (fullText === "") assistantMsgDiv.innerHTML = "";
-                                fullText += parsed.content;
-                                assistantMsgDiv.innerHTML = marked.parse(fullText);
-                            } catch (e) {}
-                        }
+                        if (!line.startsWith('data: ')) continue;
+                        const dataStr = line.slice(6);
+                        if (dataStr === '[DONE]') break;
+                        try {
+                            const parsed = JSON.parse(dataStr);
+                            if (fullText === "") assistantMsgDiv.innerHTML = "";
+                            fullText += parsed.content;
+                            assistantMsgDiv.innerHTML = DOMPurify.sanitize(marked.parse(fullText));
+                        } catch (_) {}
                     }
                 }
                 loadSessions();
-            } catch (e) { assistantMsgDiv.innerHTML = `Error: ${e.message}`; }
+            } catch (err) { assistantMsgDiv.innerHTML = `<span class="text-red-500">Error: ${err.message}</span>`; }
         };
 
         function appendMessage(role, content) {
@@ -624,8 +905,8 @@
             const div   = document.createElement('div');
             div.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`;
             const inner = document.createElement('div');
-            inner.className = `max-w-[85%] p-4 rounded-2xl ${role === 'user' ? 'bg-indian-red text-white rounded-tr-none shadow-md' : 'bg-gray-100 dark:bg-slate-800 dark:text-slate-100 rounded-tl-none border border-gray-200 dark:border-slate-700 shadow-sm'} prose dark:prose-invert prose-sm`;
-            inner.innerHTML = content.includes('animate-gear') ? content : marked.parse(content);
+            inner.className = `max-w-[90%] md:max-w-[85%] p-4 rounded-2xl ${role === 'user' ? 'bg-indian-red text-white rounded-tr-none shadow-md' : 'bg-gray-100 dark:bg-slate-800 dark:text-slate-100 rounded-tl-none border border-gray-200 dark:border-slate-700 shadow-sm'} prose dark:prose-invert prose-sm`;
+            inner.innerHTML = content.includes('animate-gear') ? content : DOMPurify.sanitize(marked.parse(content));
             div.appendChild(inner);
             container.appendChild(div);
             document.getElementById('chat-container').scrollTo({ top: 999999, behavior: 'smooth' });
@@ -634,19 +915,24 @@
 
         function renderWelcome() {
             document.getElementById('messages').innerHTML = `
-                <div id="welcome-msg" class="flex flex-col items-center justify-center min-h-[70vh] text-center animate-fade-in">
-                    <div class="inline-flex items-center justify-center w-24 h-24 bg-indian-red/10 rounded-[2.5rem] mb-6 shadow-sm">
-                        <svg width="60" height="60" viewBox="0 0 100 100"><path d="M50 15C58 15 65 22 65 30C73 30 80 37 80 45C80 53 73 60 65 60C65 68 58 75 50 75C42 75 35 68 35 60C27 60 20 53 20 45C20 37 27 30 35 30C35 22 42 15 50 15Z" fill="#CD5C5C"/><circle cx="50" cy="45" r="8" fill="#CD5C5C" stroke="white" stroke-width="2"/></svg>
+                <div id="welcome-msg" class="flex flex-col items-center justify-center min-h-[65vh] text-center animate-fade-in select-none">
+                    <div class="inline-flex items-center justify-center w-20 h-20 md:w-24 md:h-24 bg-indian-red/10 rounded-[2.5rem] mb-6 shadow-sm">
+                        <svg width="50" height="50" viewBox="0 0 100 100"><path d="M50 15C58 15 65 22 65 30C73 30 80 37 80 45C80 53 73 60 65 60C65 68 58 75 50 75C42 75 35 68 35 60C27 60 20 53 20 45C20 37 27 30 35 30C35 22 42 15 50 15Z" fill="#CD5C5C"/><circle cx="50" cy="45" r="8" fill="#CD5C5C" stroke="white" stroke-width="2"/></svg>
                     </div>
-                    <h1 class="text-4xl font-black text-gray-800 dark:text-white mb-2 tracking-tight">protoRAG⁺</h1>
-                    <p class="text-gray-500 dark:text-slate-400 text-lg">Intelligent RAG with local isolation.</p>
+                    <h1 class="text-3xl md:text-4xl font-black text-gray-800 dark:text-white mb-2 tracking-tight">protoRAG⁺</h1>
+                    <p class="text-gray-500 dark:text-slate-400 text-base md:text-lg">Intelligent RAG with local isolation.</p>
                 </div>`;
         }
 
         function toggleSidebar() {
             const s = document.getElementById('sidebar');
-            s.classList.toggle('sidebar-expanded');
-            s.classList.toggle('sidebar-collapsed');
+            if (window.innerWidth < 768) {
+                // On mobile, use slide-in overlay behaviour
+                s.classList.toggle('mobile-open');
+            } else {
+                s.classList.toggle('sidebar-expanded');
+                s.classList.toggle('sidebar-collapsed');
+            }
         }
 
         function toggleSettingsModal() {
@@ -655,28 +941,25 @@
 
         function updateConfigUI() {
             document.getElementById('config-backend').value  = config.backend_url || '';
-            document.getElementById('config-data-dir').value = config.data_dir;
             document.getElementById('config-provider').value = config.provider;
             document.getElementById('config-url').value      = config.base_url;
             document.getElementById('config-key').value      = config.api_key;
             document.getElementById('config-model').value    = config.model_name;
             document.getElementById('config-embed').value    = config.embedding_model;
             onProviderChange(config.provider);
+            // Re-set after onProviderChange resets them to defaults
             document.getElementById('config-url').value = config.base_url;
             document.getElementById('config-key').value = config.api_key;
         }
 
         function saveSettings() {
-            const oldDir           = config.data_dir;
             config.backend_url     = document.getElementById('config-backend').value.trim();
-            config.data_dir        = document.getElementById('config-data-dir').value.trim() || './protorag_storage';
             config.provider        = document.getElementById('config-provider').value;
             config.base_url        = document.getElementById('config-url').value.trim();
             config.api_key         = document.getElementById('config-key').value.trim();
             config.model_name      = document.getElementById('config-model').value.trim();
             config.embedding_model = document.getElementById('config-embed').value.trim();
             localStorage.setItem('app_config', JSON.stringify(config));
-            if (oldDir !== config.data_dir) { loadSessions(); loadSessionHistory(currentSessionId); }
             toggleSettingsModal();
         }
 
@@ -685,7 +968,8 @@
             localStorage.setItem('theme', isDark ? 'dark' : 'light');
         }
 
-        if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        if (localStorage.getItem('theme') === 'dark' ||
+            (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             document.documentElement.classList.add('dark');
         }
     </script>
