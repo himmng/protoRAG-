@@ -14,7 +14,6 @@ from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 
-# App Initialization
 app = FastAPI(title="Local Isolated RAG Chat API")
 
 app.add_middleware(
@@ -28,31 +27,38 @@ app.add_middleware(
 DEFAULT_DATA_DIR = os.environ.get("DEFAULT_DATA_DIR", "./data")
 MAX_HISTORY_ENTRIES = 200
 
+
 # ---------------------------------------------------------------------------
-# Provider URL normalisation & Standardisation
+# Provider URL normalisation
 # ---------------------------------------------------------------------------
+# Rules (applied in order):
+#   1. Strip trailing slash.
+#   2. If the URL already ends with /v1  → use as-is (user was explicit).
+#   3. If provider is "ollama"           → append /v1  (Ollama native port
+#                                          exposes OpenAI-compat at /v1).
+#   4. If provider is "lmstudio"         → append /v1  (LM Studio default).
+#   5. All other providers (openai,
+#      litellm, custom, …)              → use as-is; the user's base_url
+#                                          is assumed to be the correct root.
+#
+# This means:
+#   • http://localhost:11434          (Ollama, no /v1)   → .../v1   ✓
+#   • http://localhost:11434/v1       (Ollama, explicit)  → .../v1   ✓  no dup
+#   • http://localhost:1234/v1        (LM Studio)         → .../v1   ✓
+#   • http://localhost:4000           (LiteLLM proxy)     → .../     ✓
+#   • https://api.openai.com/v1       (OpenAI)            → .../v1   ✓
+#   • http://my-server/anything       (custom)            → as given  ✓
+
 def normalise_base_url(provider: str, base_url: str) -> str:
-    """
-    Ensures URLs are compatible with standard OpenAI client expectations.
-    Rules:
-    1. Strip trailing slashes.
-    2. If provider is Ollama/LMStudio and /v1 is missing, append it.
-    3. If URL already has /v1, keep it (prevent double appending).
-    """
     url = base_url.rstrip("/")
-    if not url:
-        return ""
-    
     if url.endswith("/v1"):
-        return url
-        
+        return url  # already correct – no matter the provider
     provider_lower = provider.lower()
-    # Ollama and LM Studio expose OpenAI-compat endpoints at /v1
     if provider_lower in ("ollama", "lmstudio"):
-        return f"{url}/v1"
-        
-    # For LiteLLM, OpenAI, or Custom, we use the URL exactly as provided
+        return url + "/v1"
+    # openai / litellm / custom: trust whatever the user supplied
     return url
+
 
 def resolve_dirs(data_dir: Optional[str]):
     base = data_dir or DEFAULT_DATA_DIR
@@ -62,12 +68,18 @@ def resolve_dirs(data_dir: Optional[str]):
     os.makedirs(docs_dir, exist_ok=True)
     return base, db_dir, docs_dir
 
+
 def safe_join(base: str, *paths: str) -> str:
     base_real = os.path.realpath(base)
     candidate = os.path.realpath(os.path.join(base, *paths))
     if not candidate.startswith(base_real + os.sep) and candidate != base_real:
         raise HTTPException(status_code=400, detail="Invalid path")
     return candidate
+
+
+def get_text_splitter() -> RecursiveCharacterTextSplitter:
+    return RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+
 
 class ChatConfig(BaseModel):
     provider: str
@@ -77,29 +89,30 @@ class ChatConfig(BaseModel):
     embedding_model: str
     data_dir: Optional[str] = None
 
+
 class ChatRequest(BaseModel):
     session_id: str
     message: str
     config: ChatConfig
 
-# ---------------------------------------------------------------------------
-# Unified LangChain Tooling (OpenAI API Compatible)
-# ---------------------------------------------------------------------------
+
 def get_embeddings(config: ChatConfig):
     base_url = normalise_base_url(config.provider, config.base_url)
-    # Use 'dummy' for local providers that don't check keys, or the user's key for OpenAI/LiteLLM
-    api_key = config.api_key if config.api_key and config.api_key.strip() not in ("", "none", "None") else "ollama"
+    # Most local providers accept any non-empty string as the key.
+    # LiteLLM / OpenAI need a real key passed through; we preserve it.
+    api_key = config.api_key if config.api_key and config.api_key.strip() not in ("", "none", "None") else "dummy"
 
     return OpenAIEmbeddings(
         model=config.embedding_model,
         openai_api_base=base_url,
         openai_api_key=api_key,
-        check_embedding_ctx_length=False, # Required for many local providers
+        check_embedding_ctx_length=False,
     )
+
 
 def get_llm(config: ChatConfig):
     base_url = normalise_base_url(config.provider, config.base_url)
-    api_key = config.api_key if config.api_key and config.api_key.strip() not in ("", "none", "None") else "ollama"
+    api_key = config.api_key if config.api_key and config.api_key.strip() not in ("", "none", "None") else "dummy"
 
     return ChatOpenAI(
         model=config.model_name,
@@ -107,6 +120,7 @@ def get_llm(config: ChatConfig):
         openai_api_key=api_key,
         streaming=True,
     )
+
 
 def load_document(file_path: str, filename: str):
     if filename.lower().endswith(".pdf"):
@@ -121,12 +135,14 @@ def load_document(file_path: str, filename: str):
         loader = TextLoader(file_path, autodetect_encoding=True)
         return loader.load()
 
+
 def load_history(session_id: str, db_dir: str):
     hist_path = os.path.join(db_dir, session_id, "history.json")
     if os.path.exists(hist_path):
         with open(hist_path, "r") as f:
             return json.load(f)
     return []
+
 
 def save_history(session_id: str, history: list, db_dir: str):
     trimmed_history = history[-MAX_HISTORY_ENTRIES:]
@@ -135,9 +151,7 @@ def save_history(session_id: str, history: list, db_dir: str):
     with open(hist_path, "w") as f:
         json.dump(trimmed_history, f)
 
-# ---------------------------------------------------------------------------
-# API Endpoints
-# ---------------------------------------------------------------------------
+
 @app.post("/api/upload")
 async def upload_document(
     session_id: str = Form(...),
@@ -151,12 +165,16 @@ async def upload_document(
 ):
     try:
         config = ChatConfig(
-            provider=provider, base_url=base_url, api_key=api_key,
-            model_name=model_name, embedding_model=embedding_model,
+            provider=provider,
+            base_url=base_url,
+            api_key=api_key,
+            model_name=model_name,
+            embedding_model=embedding_model,
             data_dir=data_dir,
         )
 
         _, db_dir, docs_dir = resolve_dirs(config.data_dir)
+
         session_doc_path = safe_join(docs_dir, session_id)
         os.makedirs(session_doc_path, exist_ok=True)
 
@@ -168,7 +186,7 @@ async def upload_document(
             f.write(content)
 
         docs = load_document(file_path, filename)
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+        text_splitter = get_text_splitter()
         splits = text_splitter.split_documents(docs)
 
         db_path = safe_join(db_dir, session_id, "chromadb")
@@ -185,16 +203,17 @@ async def upload_document(
         traceback.print_exc()
         return {"status": "error", "message": str(e)}
 
+
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
     session_id = request.session_id
     query = request.message
     config = request.config
 
-    _, db_dir, _ = resolve_dirs(config.data_dir)
+    _, db_dir, docs_dir = resolve_dirs(config.data_dir)
+
     db_path = os.path.join(db_dir, session_id, "chromadb")
     context = ""
-    
     if os.path.exists(db_path):
         try:
             embeddings = get_embeddings(config)
@@ -210,16 +229,24 @@ async def chat(request: ChatRequest):
             print(f"Retrieval Error: {e}")
 
     history = load_history(session_id, db_dir)
+
     sys_prompt = "You are a helpful and intelligent AI assistant."
     if context:
-        sys_prompt += f"\n\nContext:\n{context}\n\nUse the context provided to answer the user query."
+        sys_prompt += (
+            "\n\nContext information from the user's local documents is below.\n"
+            "---------------------\n"
+            f"{context}\n"
+            "---------------------\n"
+            "Given the context information and no prior knowledge, answer the user's query."
+        )
 
     messages = [SystemMessage(content=sys_prompt)]
+
     for msg in history[-10:]:
-        role = msg.get("role")
-        content = msg.get("content", "")
-        if role == "user": messages.append(HumanMessage(content=content))
-        elif role == "assistant": messages.append(AIMessage(content=content))
+        if msg.get("role") == "user":
+            messages.append(HumanMessage(content=msg.get("content", "")))
+        elif msg.get("role") == "assistant":
+            messages.append(AIMessage(content=msg.get("content", "")))
 
     messages.append(HumanMessage(content=query))
     llm = get_llm(config)
@@ -237,9 +264,11 @@ async def chat(request: ChatRequest):
         history.append({"role": "user", "content": query})
         history.append({"role": "assistant", "content": full_response})
         save_history(session_id, history, db_dir)
+
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")
+
 
 @app.get("/api/sessions")
 def list_sessions(data_dir: Optional[str] = Query(default=None)):
@@ -249,52 +278,128 @@ def list_sessions(data_dir: Optional[str] = Query(default=None)):
         for sid in os.listdir(db_dir):
             hist_path = os.path.join(db_dir, sid, "history.json")
             doc_path = os.path.join(docs_dir, sid)
-            has_docs = os.path.exists(doc_path) and len(os.listdir(doc_path)) > 0
-            
-            preview, timestamp = "New Chat", 0
+
+            has_docs = False
+            if os.path.exists(doc_path):
+                files = os.listdir(doc_path)
+                has_docs = len(files) > 0
+
+            preview = "New Chat"
+            timestamp = 0
             if os.path.exists(hist_path):
                 try:
                     with open(hist_path, "r") as f:
                         hist = json.load(f)
                         if hist:
-                            preview = hist[-1]["content"][:40] + "..."
+                            last_user = next(
+                                (m for m in reversed(hist) if m.get("role") == "user"),
+                                hist[-1],
+                            )
+                            content = last_user.get("content", "")
+                            preview = (content[:35] + "...") if content else "New Chat"
                     timestamp = os.path.getmtime(hist_path)
-                except: pass
-                
-            sessions.append({"id": sid, "preview": preview, "timestamp": timestamp, "is_rag": has_docs})
-    
+                except Exception:
+                    traceback.print_exc()
+                    preview = "(history corrupted)"
+            sessions.append(
+                {
+                    "id": sid,
+                    "preview": preview,
+                    "timestamp": timestamp,
+                    "is_rag": has_docs,
+                }
+            )
+
     sessions.sort(key=lambda x: x["timestamp"], reverse=True)
     return {"sessions": sessions}
+
 
 @app.get("/api/sessions/{session_id}")
 def get_session(session_id: str, data_dir: Optional[str] = Query(default=None)):
     _, db_dir, docs_dir = resolve_dirs(data_dir)
     history = load_history(session_id, db_dir)
+
     doc_path = os.path.join(docs_dir, session_id)
-    docs = os.listdir(doc_path) if os.path.exists(doc_path) else []
+    docs = []
+    if os.path.exists(doc_path):
+        docs = os.listdir(doc_path)
     return {"history": history, "documents": docs}
+
 
 @app.delete("/api/sessions/{session_id}")
 def delete_session(session_id: str, data_dir: Optional[str] = Query(default=None)):
     _, db_dir, docs_dir = resolve_dirs(data_dir)
-    for p in [os.path.join(db_dir, session_id), os.path.join(docs_dir, session_id)]:
-        if os.path.exists(p): shutil.rmtree(p)
+    db_path = os.path.join(db_dir, session_id)
+    doc_path = os.path.join(docs_dir, session_id)
+    if os.path.exists(db_path):
+        shutil.rmtree(db_path)
+    if os.path.exists(doc_path):
+        shutil.rmtree(doc_path)
     return {"status": "success"}
 
+
 @app.get("/api/sessions/{session_id}/documents/{filename}")
-def get_document(session_id: str, filename: str, data_dir: Optional[str] = Query(default=None)):
+def get_document(
+    session_id: str,
+    filename: str,
+    data_dir: Optional[str] = Query(default=None),
+):
     _, _, docs_dir = resolve_dirs(data_dir)
-    file_path = safe_join(docs_dir, session_id, filename)
-    if os.path.exists(file_path): return FileResponse(file_path)
-    raise HTTPException(status_code=404)
+    session_dir = safe_join(docs_dir, session_id)
+    safe_filename = os.path.basename(filename)
+    file_path = safe_join(session_dir, safe_filename)
+
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(file_path)
+
+
+@app.post("/api/sessions/{session_id}/documents/{filename}/delete")
+async def delete_document(session_id: str, filename: str, config: ChatConfig):
+    _, db_dir, docs_dir = resolve_dirs(config.data_dir)
+
+    session_dir = safe_join(docs_dir, session_id)
+    safe_filename = os.path.basename(filename)
+    file_path = safe_join(session_dir, safe_filename)
+
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
+    db_path = safe_join(db_dir, session_id, "chromadb")
+    if os.path.exists(db_path):
+        shutil.rmtree(db_path)
+
+    if os.path.exists(session_dir):
+        remaining_files = os.listdir(session_dir)
+        if remaining_files:
+            embeddings = get_embeddings(config)
+            vectorstore = Chroma(
+                persist_directory=db_path,
+                embedding_function=embeddings,
+                collection_name=f"col_{session_id}",
+            )
+            for f in remaining_files:
+                fp = safe_join(session_dir, f)
+                docs = load_document(fp, f)
+                text_splitter = get_text_splitter()
+                splits = text_splitter.split_documents(docs)
+                vectorstore.add_documents(splits)
+
+    return {"status": "success"}
+
 
 @app.get("/")
 def get_ui():
     if os.path.exists("index.html"):
         with open("index.html", "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
-    return HTMLResponse(content="<h1>index.html not found</h1>")
+    return HTMLResponse(content="<h1>index.html not found alongside backend.py</h1>")
+
 
 if __name__ == "__main__":
     import uvicorn
+
+    print("Starting Local RAG Application...")
+    print("Open http://localhost:8000 in your browser.")
     uvicorn.run("backend:app", host="0.0.0.0", port=8000, reload=True)
