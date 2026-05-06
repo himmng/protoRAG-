@@ -230,24 +230,30 @@ async def chat(request: ChatRequest):
     history = load_history(session_id, db_dir)
 
     sys_prompt = "You are a helpful and intelligent AI assistant."
-    if context:
-        sys_prompt += (
-            "\n\nContext information from the user's local documents is below.\n"
-            "---------------------\n"
-            f"{context}\n"
-            "---------------------\n"
-            "Given the context information and no prior knowledge, answer the user's query."
-        )
-
     messages = [SystemMessage(content=sys_prompt)]
 
+    # Load history
     for msg in history[-10:]:
         if msg.get("role") == "user":
             messages.append(HumanMessage(content=msg.get("content", "")))
         elif msg.get("role") == "assistant":
             messages.append(AIMessage(content=msg.get("content", "")))
 
-    messages.append(HumanMessage(content=query))
+    # ── FIX: Inject context directly into the final HumanMessage instead of SystemMessage ──
+    # This prevents the LLM from ignoring the context due to recency bias or lack of System prompt support.
+    if context:
+        augmented_query = (
+            "Context information from the user's local documents is below.\n"
+            "---------------------\n"
+            f"{context}\n"
+            "---------------------\n"
+            "Given the context information and no prior knowledge, answer the user's query.\n\n"
+            f"User Query: {query}"
+        )
+        messages.append(HumanMessage(content=augmented_query))
+    else:
+        messages.append(HumanMessage(content=query))
+        
     llm = get_llm(config)
 
     async def generate():
