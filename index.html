@@ -81,7 +81,6 @@
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-        /* Provider hint badge */
         .provider-hint {
             font-size: 10px;
             font-family: monospace;
@@ -224,6 +223,14 @@
             </div>
             
             <div class="p-6 space-y-5 max-h-[70vh] overflow-y-auto no-scrollbar">
+
+                <!-- ── CHANGE 1: Backend URL field (new) ── -->
+                <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                    <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Backend URL</label>
+                    <input id="config-backend" type="text" placeholder="https://xxxx.trycloudflare.com (blank = same origin)" class="w-full bg-white dark:bg-slate-800 p-3 rounded-xl outline-none border border-gray-200 dark:border-slate-700 focus:border-indian-red transition-all font-mono text-xs">
+                    <div class="text-[10px] text-gray-400 mt-1">Your cloudflared tunnel for backend.py. Leave blank when running locally.</div>
+                </div>
+
                 <!-- Data Directory -->
                 <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
                     <div class="flex items-center justify-between mb-2">
@@ -250,7 +257,6 @@
                             <option value="litellm">LiteLLM</option>
                             <option value="custom">Custom</option>
                         </select>
-                        <!-- Dynamic hint under provider -->
                         <div id="provider-hint" class="provider-hint mt-1"></div>
                     </div>
                     <div>
@@ -297,7 +303,7 @@
                         </tbody>
                     </table>
                     <p class="text-[10px] text-gray-400 mt-3">
-                        ℹ️ You don't need to add <code class="bg-gray-200 dark:bg-slate-700 px-1 rounded">/v1</code> for Ollama or LM Studio — the backend appends it automatically. For OpenAI or custom endpoints that already include <code class="bg-gray-200 dark:bg-slate-700 px-1 rounded">/v1</code>, it will not be duplicated.
+                        ℹ️ You don't need to add <code class="bg-gray-200 dark:bg-slate-700 px-1 rounded">/v1</code> for Ollama or LM Studio — the backend appends it automatically.
                     </p>
                 </div>
             </div>
@@ -310,17 +316,12 @@
     </div>
 
     <script>
-        // -----------------------------------------------------------------------
-        // Provider defaults
-        // Base URL here is what the USER sets — no /v1 needed for Ollama/LMStudio
-        // because the backend's normalise_base_url() handles it.
-        // -----------------------------------------------------------------------
         const PROVIDER_DEFAULTS = {
-            ollama:   { base_url: 'http://localhost:11434',       api_key: 'none',        hint: 'Auto-appends /v1 · needs OLLAMA_ORIGINS set' },
-            lmstudio: { base_url: 'http://localhost:1234',        api_key: 'lm-studio',   hint: 'Auto-appends /v1 · LM Studio server mode' },
-            openai:   { base_url: 'https://api.openai.com/v1',    api_key: '',            hint: 'Include /v1 in URL · real API key required' },
-            litellm:  { base_url: 'http://localhost:4000',        api_key: 'any',         hint: 'Proxy root · /v1 added by LiteLLM automatically' },
-            custom:   { base_url: '',                             api_key: '',            hint: 'Use the exact endpoint your server expects' },
+            ollama:   { base_url: 'http://localhost:11434', api_key: 'none',      hint: 'Auto-appends /v1 · needs OLLAMA_ORIGINS set' },
+            lmstudio: { base_url: 'http://localhost:1234',  api_key: 'lm-studio', hint: 'Auto-appends /v1 · LM Studio server mode' },
+            openai:   { base_url: 'https://api.openai.com/v1', api_key: '',       hint: 'Include /v1 in URL · real API key required' },
+            litellm:  { base_url: 'http://localhost:4000',  api_key: 'any',       hint: 'Proxy root · /v1 added by LiteLLM automatically' },
+            custom:   { base_url: '',                       api_key: '',           hint: 'Use the exact endpoint your server expects' },
         };
 
         const URL_HINTS = {
@@ -332,7 +333,9 @@
         };
 
         let currentSessionId = localStorage.getItem('last_session_id') || crypto.randomUUID();
+
         const config = {
+            backend_url:     '',                   // ── CHANGE 2: added backend_url ──
             data_dir:        './protorag_storage',
             provider:        'ollama',
             base_url:        'http://localhost:11434',
@@ -343,6 +346,12 @@
 
         const savedConfig = localStorage.getItem('app_config');
         if (savedConfig) Object.assign(config, JSON.parse(savedConfig));
+
+        // ── CHANGE 3: api() helper — all fetch calls go through this ──
+        // Falls back to relative URLs when backend_url is empty (local dev).
+        function api(path) {
+            return (config.backend_url || '').replace(/\/$/, '') + path;
+        }
 
         document.addEventListener('DOMContentLoaded', () => {
             loadSessions();
@@ -358,40 +367,28 @@
             });
         });
 
-        async function chat(prompt) {
-        const res = await fetch("/.netlify/functions/chat", {
-            method: "POST",
-            body: JSON.stringify({ prompt })
-        });
-
-        const data = await res.json();
-        console.log(data.answer);
-        }
-
         function autoResizeTextArea(el) {
             el.style.height = '48px';
             el.style.height = el.scrollHeight + 'px';
         }
 
-        // Called when provider dropdown changes
         function onProviderChange(provider) {
             const defaults = PROVIDER_DEFAULTS[provider] || PROVIDER_DEFAULTS.custom;
-            const urlInput   = document.getElementById('config-url');
-            const keyInput   = document.getElementById('config-key');
-            const hintEl     = document.getElementById('provider-hint');
-            const urlHintEl  = document.getElementById('url-hint');
-
-            // Only overwrite URL/key if user hasn't customised them yet
-            urlInput.value   = defaults.base_url;
-            keyInput.value   = defaults.api_key;
-            urlInput.placeholder = URL_HINTS[provider] || '';
-            hintEl.textContent   = defaults.hint;
+            const urlInput  = document.getElementById('config-url');
+            const keyInput  = document.getElementById('config-key');
+            const hintEl    = document.getElementById('provider-hint');
+            const urlHintEl = document.getElementById('url-hint');
+            urlInput.value        = defaults.base_url;
+            keyInput.value        = defaults.api_key;
+            urlInput.placeholder  = URL_HINTS[provider] || '';
+            hintEl.textContent    = defaults.hint;
             urlHintEl.textContent = URL_HINTS[provider] || '';
         }
 
         async function loadSessions() {
             try {
-                const res = await fetch(`/api/sessions?data_dir=${encodeURIComponent(config.data_dir)}`);
+                // ── CHANGE 4: all fetch calls now use api() ──
+                const res = await fetch(api(`/api/sessions?data_dir=${encodeURIComponent(config.data_dir)}`));
                 const data = await res.json();
                 const list = document.getElementById('session-list');
                 
@@ -404,7 +401,7 @@
                             ${s.is_rag ? ragIcon : chatIcon}
                         </div>
                         <span class="nav-text ml-4 text-sm truncate flex-1 pr-6">${s.preview || 'Untitled Chat'}</span>
-                        <button onclick="event.stopPropagation(); deleteSession('${s.id}')" class="absolute right-2 opacity-0 group-hover:opacity-100 p-1.5 hover:text-red-500 transition-all rounded-lg hover:bg-white dark:hover:bg-slate-700">
+                        <button onclick="event.stopPropagation(); deleteSession('${s.id}')" class="absolute right-2 opacity-0 group-hover:opacity-100 p-1.5 hover:text-red-500 transition-all rounded-lg hover:bg-white dark:hover:bg-slateify-700">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                         </button>
                     </div>
@@ -451,7 +448,7 @@
             overlay.className = 'fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 md:p-10 animate-fade-in';
             overlay.onclick = (e) => { if (e.target === overlay) closeDocModal(); };
 
-            const fileUrl = `/api/sessions/${currentSessionId}/documents/${encodeURIComponent(filename)}?data_dir=${encodeURIComponent(config.data_dir)}`;
+            const fileUrl = api(`/api/sessions/${currentSessionId}/documents/${encodeURIComponent(filename)}?data_dir=${encodeURIComponent(config.data_dir)}`);
             const ext = filename.split('.').pop().toLowerCase();
 
             overlay.innerHTML = `
@@ -505,7 +502,7 @@
             if (e) e.stopPropagation();
             if (!confirm(`Delete ${filename}?`)) return;
             try {
-                const res = await fetch(`/api/sessions/${currentSessionId}/documents/${encodeURIComponent(filename)}/delete`, {
+                const res = await fetch(api(`/api/sessions/${currentSessionId}/documents/${encodeURIComponent(filename)}/delete`), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(config)
@@ -517,7 +514,7 @@
         async function deleteSession(sid) {
             if (!confirm('Delete this session?')) return;
             try {
-                await fetch(`/api/sessions/${sid}?data_dir=${encodeURIComponent(config.data_dir)}`, { method: 'DELETE' });
+                await fetch(api(`/api/sessions/${sid}?data_dir=${encodeURIComponent(config.data_dir)}`), { method: 'DELETE' });
                 if (sid === currentSessionId) createNewSession();
                 else loadSessions();
             } catch (e) { console.error(e); }
@@ -526,7 +523,7 @@
         async function loadSessionHistory(sid) {
             currentSessionId = sid;
             localStorage.setItem('last_session_id', sid);
-            const res  = await fetch(`/api/sessions/${sid}?data_dir=${encodeURIComponent(config.data_dir)}`);
+            const res  = await fetch(api(`/api/sessions/${sid}?data_dir=${encodeURIComponent(config.data_dir)}`));
             const data = await res.json();
             const container = document.getElementById('messages');
             container.innerHTML = '';
@@ -556,7 +553,7 @@
 
             appendMessage('assistant', `Indexing **${file.name}**...`);
             try {
-                const res    = await fetch('/api/upload', { method: 'POST', body: formData });
+                const res    = await fetch(api('/api/upload'), { method: 'POST', body: formData });
                 const result = await res.json();
                 appendMessage('assistant', result.message);
                 await loadSessionHistory(currentSessionId);
@@ -586,7 +583,7 @@
 
             let fullText = "";
             try {
-                const response = await fetch('/api/chat', {
+                const response = await fetch(api('/api/chat'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ session_id: currentSessionId, message: msg, config })
@@ -652,28 +649,27 @@
         }
 
         function updateConfigUI() {
+            document.getElementById('config-backend').value  = config.backend_url || '';
             document.getElementById('config-data-dir').value = config.data_dir;
-            document.getElementById('config-provider').value  = config.provider;
-            document.getElementById('config-url').value       = config.base_url;
-            document.getElementById('config-key').value       = config.api_key;
-            document.getElementById('config-model').value     = config.model_name;
-            document.getElementById('config-embed').value     = config.embedding_model;
-            // Trigger hint update
+            document.getElementById('config-provider').value = config.provider;
+            document.getElementById('config-url').value      = config.base_url;
+            document.getElementById('config-key').value      = config.api_key;
+            document.getElementById('config-model').value    = config.model_name;
+            document.getElementById('config-embed').value    = config.embedding_model;
             onProviderChange(config.provider);
-            // But restore saved URL/key after onProviderChange overwrites them
             document.getElementById('config-url').value = config.base_url;
             document.getElementById('config-key').value = config.api_key;
         }
 
         function saveSettings() {
-            const oldDir      = config.data_dir;
-            config.data_dir   = document.getElementById('config-data-dir').value.trim() || './protorag_storage';
-            config.provider   = document.getElementById('config-provider').value;
-            config.base_url   = document.getElementById('config-url').value.trim();
-            config.api_key    = document.getElementById('config-key').value.trim();
-            config.model_name = document.getElementById('config-model').value.trim();
+            const oldDir           = config.data_dir;
+            config.backend_url     = document.getElementById('config-backend').value.trim();
+            config.data_dir        = document.getElementById('config-data-dir').value.trim() || './protorag_storage';
+            config.provider        = document.getElementById('config-provider').value;
+            config.base_url        = document.getElementById('config-url').value.trim();
+            config.api_key         = document.getElementById('config-key').value.trim();
+            config.model_name      = document.getElementById('config-model').value.trim();
             config.embedding_model = document.getElementById('config-embed').value.trim();
-            
             localStorage.setItem('app_config', JSON.stringify(config));
             if (oldDir !== config.data_dir) { loadSessions(); loadSessionHistory(currentSessionId); }
             toggleSettingsModal();
@@ -689,4 +685,4 @@
         }
     </script>
 </body>
-</html> 
+</html>

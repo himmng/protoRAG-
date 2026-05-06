@@ -28,35 +28,13 @@ DEFAULT_DATA_DIR = os.environ.get("DEFAULT_DATA_DIR", "./data")
 MAX_HISTORY_ENTRIES = 200
 
 
-# ---------------------------------------------------------------------------
-# Provider URL normalisation
-# ---------------------------------------------------------------------------
-# Rules (applied in order):
-#   1. Strip trailing slash.
-#   2. If the URL already ends with /v1  → use as-is (user was explicit).
-#   3. If provider is "ollama"           → append /v1  (Ollama native port
-#                                          exposes OpenAI-compat at /v1).
-#   4. If provider is "lmstudio"         → append /v1  (LM Studio default).
-#   5. All other providers (openai,
-#      litellm, custom, …)              → use as-is; the user's base_url
-#                                          is assumed to be the correct root.
-#
-# This means:
-#   • http://localhost:11434          (Ollama, no /v1)   → .../v1   ✓
-#   • http://localhost:11434/v1       (Ollama, explicit)  → .../v1   ✓  no dup
-#   • http://localhost:1234/v1        (LM Studio)         → .../v1   ✓
-#   • http://localhost:4000           (LiteLLM proxy)     → .../     ✓
-#   • https://api.openai.com/v1       (OpenAI)            → .../v1   ✓
-#   • http://my-server/anything       (custom)            → as given  ✓
-
 def normalise_base_url(provider: str, base_url: str) -> str:
     url = base_url.rstrip("/")
     if url.endswith("/v1"):
-        return url  # already correct – no matter the provider
+        return url
     provider_lower = provider.lower()
     if provider_lower in ("ollama", "lmstudio"):
         return url + "/v1"
-    # openai / litellm / custom: trust whatever the user supplied
     return url
 
 
@@ -98,10 +76,7 @@ class ChatRequest(BaseModel):
 
 def get_embeddings(config: ChatConfig):
     base_url = normalise_base_url(config.provider, config.base_url)
-    # Most local providers accept any non-empty string as the key.
-    # LiteLLM / OpenAI need a real key passed through; we preserve it.
     api_key = config.api_key if config.api_key and config.api_key.strip() not in ("", "none", "None") else "dummy"
-
     return OpenAIEmbeddings(
         model=config.embedding_model,
         openai_api_base=base_url,
@@ -113,7 +88,6 @@ def get_embeddings(config: ChatConfig):
 def get_llm(config: ChatConfig):
     base_url = normalise_base_url(config.provider, config.base_url)
     api_key = config.api_key if config.api_key and config.api_key.strip() not in ("", "none", "None") else "dummy"
-
     return ChatOpenAI(
         model=config.model_name,
         openai_api_base=base_url,
@@ -198,6 +172,11 @@ async def upload_document(
         )
         vectorstore.add_documents(splits)
 
+        # ── Save embedding model metadata so retrieval can detect mismatches ──
+        meta_path = os.path.join(db_dir, session_id, "embed_meta.json")
+        with open(meta_path, "w") as f:
+            json.dump({"embedding_model": config.embedding_model}, f)
+
         return {"status": "success", "message": f"Uploaded and indexed {filename}."}
     except Exception as e:
         traceback.print_exc()
@@ -214,8 +193,24 @@ async def chat(request: ChatRequest):
 
     db_path = os.path.join(db_dir, session_id, "chromadb")
     context = ""
+    retrieval_warning = ""
+
     if os.path.exists(db_path):
         try:
+            # ── Detect embedding model mismatch before querying Chroma ──
+            meta_path = os.path.join(db_dir, session_id, "embed_meta.json")
+            if os.path.exists(meta_path):
+                with open(meta_path) as f:
+                    meta = json.load(f)
+                if meta.get("embedding_model") != config.embedding_model:
+                    retrieval_warning = (
+                        f"\n\n> ⚠️ **RAG skipped — embedding model mismatch**: "
+                        f"documents indexed with `{meta['embedding_model']}` "
+                        f"but settings use `{config.embedding_model}`. "
+                        f"Re-upload your documents to fix this."
+                    )
+                    raise ValueError("embedding model mismatch")
+
             embeddings = get_embeddings(config)
             vectorstore = Chroma(
                 persist_directory=db_path,
@@ -225,8 +220,12 @@ async def chat(request: ChatRequest):
             retriever = vectorstore.as_retriever(search_kwargs={"k": 4})
             docs = retriever.invoke(query)
             context = "\n\n".join([d.page_content for d in docs])
+            print(f"[RAG] Retrieved {len(docs)} chunks for session {session_id}")
         except Exception as e:
             print(f"Retrieval Error: {e}")
+            traceback.print_exc()
+            if not retrieval_warning:
+                retrieval_warning = f"\n\n> ⚠️ **RAG retrieval failed**: {str(e)}"
 
     history = load_history(session_id, db_dir)
 
@@ -260,6 +259,11 @@ async def chat(request: ChatRequest):
                     yield f"data: {json.dumps({'content': chunk.content})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'content': f'\\n\\n**Connection Error:** {str(e)}'})}\n\n"
+
+        # ── Append retrieval warning to response so user sees it in chat ──
+        if retrieval_warning:
+            full_response += retrieval_warning
+            yield f"data: {json.dumps({'content': retrieval_warning})}\n\n"
 
         history.append({"role": "user", "content": query})
         history.append({"role": "assistant", "content": full_response})
