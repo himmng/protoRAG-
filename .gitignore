@@ -16,3 +16,6 @@ __pycache__/
 *.swo
 # Local Netlify folder
 .netlify
+data
+node_modules
+
