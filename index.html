@@ -118,17 +118,18 @@
         }
         .dark .provider-hint { background: rgba(205,92,92,0.18); }
 
-        /* ── Floating doc bar — always below the top-bar buttons ──────── */
-        #floating-doc-bar {
-            /* On desktop: top-left of main area. On mobile: full width below top bar. */
-            top: 4.5rem;
+        /* ── Sidebar Documents section ─────────────────────────────────── */
+        #sidebar-docs { transition: opacity 0.2s ease; }
+        .sidebar-collapsed #sidebar-docs .docs-header,
+        .sidebar-collapsed #sidebar-docs .doc-filename,
+        .sidebar-collapsed #sidebar-docs .doc-del { display: none; }
+        .sidebar-collapsed #sidebar-docs .doc-pill {
+            justify-content: center;
+            padding: 8px;
         }
-        @media (max-width: 767px) {
-            #floating-doc-bar {
-                left: 0.75rem;
-                right: 4.5rem;   /* leave room for dark-mode toggle */
-                max-width: none;
-            }
+        .sidebar-collapsed #sidebar-docs .doc-pill .doc-open {
+            justify-content: center;
+            flex: none;
         }
 
         /* ── Input area responsive fixes ──────────────────────────────── */
@@ -259,7 +260,22 @@
             </button>
         </div>
 
-        <div class="flex-1 overflow-y-auto px-3 space-y-1 py-2" id="session-list"></div>
+        <div class="flex-1 overflow-y-auto px-3 space-y-1 py-2 min-h-0" id="session-list"></div>
+
+        <!-- Documents section — appears only when the current session has docs -->
+        <div id="sidebar-docs" class="hidden border-t border-gray-200 dark:border-slate-800 flex-shrink-0">
+            <div class="docs-header px-4 pt-3 pb-1.5 flex items-center justify-between">
+                <span class="nav-text text-[10px] font-bold text-gray-400 uppercase tracking-widest">Documents</span>
+                <button onclick="document.getElementById('file-input').click()"
+                        class="nav-text p-1 rounded-md text-gray-400 hover:text-indian-red hover:bg-indian-red/10 transition-colors"
+                        title="Add document">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="doc-pills" class="px-3 pb-3 space-y-1 overflow-y-auto" style="max-height: 40vh"></div>
+        </div>
 
         <div class="p-3 border-t border-gray-200 dark:border-slate-800">
             <button onclick="toggleSettingsModal()" class="bottom-btn flex items-center gap-4 w-full p-2.5 rounded-xl text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-800 transition-all overflow-hidden group">
@@ -277,6 +293,9 @@
 
         <!-- Top-right controls -->
         <div class="absolute top-3 right-4 z-40 flex items-center gap-2">
+            <button onclick="toggleDocsModal()" title="Documentation" class="p-2.5 bg-white/80 dark:bg-slate-800/80 backdrop-blur border border-gray-200 dark:border-slate-700 rounded-full shadow-lg hover:scale-110 transition-all text-indian-red">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path><line x1="9" y1="7" x2="16" y2="7"></line><line x1="9" y1="11" x2="16" y2="11"></line></svg>
+            </button>
             <button onclick="toggleDarkMode()" class="p-2.5 bg-white/80 dark:bg-slate-800/80 backdrop-blur border border-gray-200 dark:border-slate-700 rounded-full shadow-lg hover:scale-110 transition-all">
                 <svg id="theme-sun" class="block dark:hidden text-orange-500" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
                 <svg id="theme-moon" class="hidden dark:block text-blue-400" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
@@ -287,20 +306,6 @@
         <button id="mobile-menu-btn" onclick="openMobileSidebar()" class="absolute top-3 left-4 z-40 p-2.5 bg-white/80 dark:bg-slate-800/80 backdrop-blur border border-gray-200 dark:border-slate-700 rounded-full shadow-lg hover:scale-110 transition-all items-center justify-center">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
-
-        <!-- Floating Document Bar -->
-        <div id="floating-doc-bar" class="hidden absolute left-4 z-30 min-w-[260px] max-w-[calc(100%-5rem)] transition-all duration-300">
-            <div class="bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border border-gray-200 dark:border-slate-700 rounded-2xl shadow-xl p-2 flex items-center gap-2">
-                <div class="flex flex-col gap-2 px-1 items-stretch max-h-36 overflow-y-auto flex-1" id="doc-pills"></div>
-                <div class="h-6 w-px bg-gray-200 dark:bg-slate-700 flex-shrink-0"></div>
-                <button onclick="document.getElementById('file-input').click()"
-                        class="flex-shrink-0 p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:text-indian-red hover:bg-indian-red/10 transition-colors" title="Add document">
-                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                        <path d="M12 5v14M5 12h14"/>
-                    </svg>
-                </button>
-            </div>
-        </div>
 
         <!-- Chat Area -->
         <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-8 pt-20">
@@ -333,11 +338,11 @@
                     <form id="chat-form" class="flex-1 relative flex items-end bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-[2rem] shadow-2xl px-4 py-2 ring-1 ring-black/5 min-w-0">
                         <!-- @mention autocomplete popup -->
                         <div id="at-mention-popup" class="hidden"></div>
-                        <textarea id="message-input" rows="1" placeholder="Message… use @filename.pdf to target a document"
+                        <textarea id="message-input" rows="1" placeholder="Message… use @filename to target a document"
                                   class="flex-1 max-h-48 py-3 px-2 bg-transparent outline-none resize-none text-gray-800 dark:text-slate-100 text-sm md:text-base"
                                   oninput="autoResizeTextArea(this); handleAtMention(this);"
                                   onkeydown="handleAtMentionKey(event)"></textarea>
-                        <button type="submit" class="p-2.5 bg-indian-red text-white rounded-full hover:scale-105 transition-all shadow-lg mb-1 flex-shrink-0">
+                        <button id="send-stop-btn" type="button" title="Send message" class="p-2.5 bg-indian-red text-white rounded-full hover:scale-105 transition-all shadow-lg mb-1 flex-shrink-0">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                         </button>
                     </form>
@@ -346,12 +351,12 @@
                 <!-- Disclaimer — hidden on mobile to save space -->
                 <div class="hidden md:flex items-center justify-between text-[11px] text-gray-500 dark:text-slate-400 mt-2 px-2 select-none">
                     <span><b>Disclaimer:</b> protoRAG⁺ can make mistakes.</span>
-                    <span>Type <b>@filename</b> to target a document &nbsp;·&nbsp; <b>Shift+Enter</b> for new line</span>
+                    <span><b>Tip:</b> Type <b>@filename</b> to target a document &nbsp;·&nbsp; <b>Shift+Enter</b> for new line</span>
                 </div>
             </div>
         </div>
 
-        <input type="file" id="file-input" class="hidden" onchange="uploadFile(this.files[0])">
+        <input type="file" id="file-input" class="hidden" multiple onchange="uploadFiles(this.files)">
     </main>
 
     <!-- ── Settings Modal ──────────────────────────────────────────────── -->
@@ -372,6 +377,13 @@
                     <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Remote URL (Leave blank when running locally)</label>
                     <input id="config-backend" type="text" placeholder="use tailscale, cloudflared (blank = same origin)" class="w-full bg-white dark:bg-slate-800 p-3 rounded-xl outline-none border border-gray-200 dark:border-slate-700 focus:border-indian-red transition-all font-mono text-xs">
                     <div class="text-[10px] text-gray-400 mt-1">Your tailscale, cloudflared tunnel for remote backend.</div>
+                </div>
+
+                <!-- Data Storage Path -->
+                <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                    <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Data Storage Path (Leave blank for default <code class="bg-gray-200 dark:bg-slate-700 px-1 rounded">./data</code>)</label>
+                    <input id="config-data-dir" type="text" placeholder="e.g. /mnt/rag-data or ~/protorag-data" class="w-full bg-white dark:bg-slate-800 p-3 rounded-xl outline-none border border-gray-200 dark:border-slate-700 focus:border-indian-red transition-all font-mono text-xs">
+                    <div class="text-[10px] text-gray-400 mt-1">Path on the <b>backend host</b> where vector DB and documents are stored. Will be created if it doesn't exist.</div>
                 </div>
 
                 <!-- Provider & Key -->
@@ -448,6 +460,123 @@
         </div>
     </div>
 
+    <!-- ── Documentation Modal ─────────────────────────────────────────── -->
+    <div id="docs-modal" class="hidden fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4" onclick="if(event.target===this) toggleDocsModal()">
+        <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-2xl shadow-2xl border border-gray-200 dark:border-slate-800 overflow-hidden animate-zoom-in">
+            <div class="p-6 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center">
+                <div>
+                    <h2 class="text-xl font-bold">Documentation</h2>
+                    <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">How protoRAG⁺ works</p>
+                </div>
+                <button onclick="toggleDocsModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl font-light">&times;</button>
+            </div>
+
+            <div class="p-6 space-y-5 max-h-[70vh] overflow-y-auto no-scrollbar text-sm text-gray-700 dark:text-slate-300 leading-relaxed">
+
+                <!-- What is dynamic RAG -->
+                <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                    <h3 class="text-[11px] font-bold text-indian-red uppercase tracking-wider mb-2">Dynamic RAG</h3>
+                    <p>
+                        protoRAG⁺ is a <b>dynamic RAG</b> system: each chat session has its own vector index that you can grow,
+                        shrink, or empty at any time. Retrieval automatically engages or disengages based on whether the
+                        session currently holds any documents — you never flip a mode switch yourself.
+                    </p>
+                </div>
+
+                <!-- 1. Session modes -->
+                <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                    <h3 class="text-[11px] font-bold text-indian-red uppercase tracking-wider mb-3">1 · Session lifecycle</h3>
+                    <div class="space-y-3">
+                        <div class="flex gap-3">
+                            <span class="flex-shrink-0 w-2 h-2 mt-2 rounded-full bg-indian-red"></span>
+                            <p>
+                                A new session starts in <b>chat-only</b> mode. Messages go straight to the LLM with no
+                                retrieval — useful for plain conversation, brainstorming, or coding help.
+                            </p>
+                        </div>
+                        <div class="flex gap-3">
+                            <span class="flex-shrink-0 w-2 h-2 mt-2 rounded-full bg-indian-red"></span>
+                            <p>
+                                The moment you upload your <b>first document</b>, the session promotes itself to
+                                <b>RAG mode</b>. Every subsequent question is answered using context retrieved from your
+                                documents.
+                            </p>
+                        </div>
+                        <div class="flex gap-3">
+                            <span class="flex-shrink-0 w-2 h-2 mt-2 rounded-full bg-indian-red"></span>
+                            <p>
+                                Delete documents one by one and the index shrinks live. Once <b>all</b> documents are removed,
+                                the session quietly drops back to <b>chat-only</b> mode — same chat, same history, no retrieval.
+                            </p>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-gray-500 dark:text-slate-400 mt-3 italic">
+                        The chat / RAG indicator next to each session in the sidebar reflects this state.
+                    </p>
+                </div>
+
+                <!-- 2. Document workflow -->
+                <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                    <h3 class="text-[11px] font-bold text-indian-red uppercase tracking-wider mb-3">2 · Document workflow</h3>
+                    <div class="space-y-3">
+                        <div class="flex gap-3">
+                            <span class="flex-shrink-0 w-2 h-2 mt-2 rounded-full bg-indian-red"></span>
+                            <p>
+                                <b>Upload one at a time</b> or <b>select many files at once</b> — both work. Files are chunked,
+                                embedded, and appended to the session's vector store on the fly.
+                            </p>
+                        </div>
+                        <div class="flex gap-3">
+                            <span class="flex-shrink-0 w-2 h-2 mt-2 rounded-full bg-indian-red"></span>
+                            <p>
+                                <b>Add more anytime.</b> New uploads merge into the existing index without rebuilding —
+                                ask questions immediately after.
+                            </p>
+                        </div>
+                        <div class="flex gap-3">
+                            <span class="flex-shrink-0 w-2 h-2 mt-2 rounded-full bg-indian-red"></span>
+                            <p>
+                                <b>Delete individually</b> from the document list and only that file's chunks are removed
+                                from the index. Other documents stay searchable.
+                            </p>
+                        </div>
+                        <div class="flex gap-3">
+                            <span class="flex-shrink-0 w-2 h-2 mt-2 rounded-full bg-indian-red"></span>
+                            <p>
+                                Use <code class="bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-[11px]">@filename</code>
+                                in your message to restrict retrieval to specific documents in the session.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Isolation -->
+                <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                    <h3 class="text-[11px] font-bold text-indian-red uppercase tracking-wider mb-2">3 · Per-session isolation</h3>
+                    <p>
+                        Every session has its own vector collection and document folder under
+                        <code class="bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-[11px]">./data/</code>. Documents
+                        uploaded in one session are never visible to another — switch sessions to switch corpora.
+                    </p>
+                </div>
+
+                <!-- 4. Tips -->
+                <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                    <h3 class="text-[11px] font-bold text-indian-red uppercase tracking-wider mb-2">Tips</h3>
+                    <ul class="list-disc pl-5 space-y-1.5 text-[13px]">
+                        <li>If you change the embedding model in Settings, re-upload documents — old vectors won't match the new model.</li>
+                        <li>Supported formats: txt, csv, pdf, json, yaml, docx, xlsx, pptx, and more.</li>
+                        <li>Configure provider, models, and remote backend URL from the <b>Settings</b> panel.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="p-6 bg-gray-50 dark:bg-slate-800/50 flex justify-end border-t border-gray-100 dark:border-slate-800">
+                <button onclick="toggleDocsModal()" class="bg-indian-red text-white px-8 py-2.5 rounded-xl font-bold shadow-lg hover:brightness-110 active:scale-95 transition-all text-sm">Got it</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const PROVIDER_DEFAULTS = {
             ollama:    { base_url: 'http://localhost:11434',     api_key: 'none',      hint: 'Auto-appends /v1 · needs OLLAMA_ORIGINS set' },
@@ -470,6 +599,7 @@
 
         const config = {
             backend_url:     '',
+            data_dir:        '',
             provider:        'ollama',
             base_url:        'http://localhost:11434',
             api_key:         'none',
@@ -493,6 +623,14 @@
             return (config.backend_url || '').replace(/\/$/, '') + path;
         }
 
+        // Append data_dir as a query parameter to GET/DELETE URLs.
+        function apiWithDataDir(path) {
+            const url = api(path);
+            if (!config.data_dir) return url;
+            const sep = url.includes('?') ? '&' : '?';
+            return url + sep + 'data_dir=' + encodeURIComponent(config.data_dir);
+        }
+
         /* ── Mobile sidebar helpers ─────────────────────────────────────── */
         function openMobileSidebar() {
             document.getElementById('sidebar').classList.add('mobile-open');
@@ -505,6 +643,7 @@
             loadSessions();
             loadSessionHistory(currentSessionId);
             updateConfigUI();
+            updateSendStopBtn();
 
             const msgInput = document.getElementById('message-input');
             msgInput.addEventListener('keydown', (e) => {
@@ -523,6 +662,24 @@
         function autoResizeTextArea(el) {
             el.style.height = '48px';
             el.style.height = el.scrollHeight + 'px';
+        }
+
+        /* ── Streaming state ────────────────────────────────────────────── */
+        let isStreaming = false;
+        let abortController = null;
+
+        function updateSendStopBtn() {
+            const btn = document.getElementById('send-stop-btn');
+            if (!btn) return;
+            if (isStreaming) {
+                btn.title = 'Stop response';
+                btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="18" height="18" rx="2.5"/></svg>`;
+                btn.onclick = (e) => { e.preventDefault(); if (abortController) abortController.abort(); };
+            } else {
+                btn.title = 'Send message';
+                btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`;
+                btn.onclick = (e) => { e.preventDefault(); document.getElementById('chat-form').requestSubmit(); };
+            }
         }
 
         /* ── @mention autocomplete ──────────────────────────────────────── */
@@ -613,11 +770,12 @@
             const textarea = document.getElementById('message-input');
             const val = textarea.value;
             const pos = textarea.selectionStart;
-            // Replace from the @ up to the cursor with @filename + space
             const before = val.slice(0, atMentionStart);
             const after  = val.slice(pos);
-            textarea.value = before + '@' + filename + ' ' + after;
-            const newPos = atMentionStart + filename.length + 2;
+            // Filenames with spaces must be quoted so the backend regex @"..." matches them
+            const tag = filename.includes(' ') ? `"${filename}"` : filename;
+            textarea.value = before + '@' + tag + ' ' + after;
+            const newPos = atMentionStart + tag.length + 2;
             textarea.setSelectionRange(newPos, newPos);
             textarea.focus();
             hideAtPopup();
@@ -644,7 +802,7 @@
 
         async function loadSessions() {
             try {
-                const res  = await fetch(api('/api/sessions'));
+                const res  = await fetch(apiWithDataDir('/api/sessions'));
                 const data = await res.json();
                 const list = document.getElementById('session-list');
 
@@ -671,13 +829,13 @@
             } catch (e) { console.error(e); }
         }
 
-        /* ── Document bar ───────────────────────────────────────────────── */
+        /* ── Document bar (sidebar section) ─────────────────────────────── */
         function updateDocBar(docs) {
             setSessionDocs(docs);   // keep @mention autocomplete in sync
-            const bar   = document.getElementById('floating-doc-bar');
-            const pills = document.getElementById('doc-pills');
-            if (!docs || docs.length === 0) { bar.classList.add('hidden'); return; }
-            bar.classList.remove('hidden');
+            const section = document.getElementById('sidebar-docs');
+            const pills   = document.getElementById('doc-pills');
+            if (!docs || docs.length === 0) { section.classList.add('hidden'); return; }
+            section.classList.remove('hidden');
 
             const getFileIcon = (filename) => {
                 const ext = (filename.split('.').pop() || '').toLowerCase();
@@ -687,12 +845,12 @@
 
             pills.innerHTML = docs.map(d => {
                 const esc = escapeHtml(d);
-                return `<div class="flex items-center justify-between gap-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-2 rounded-xl text-[11px] font-semibold text-slate-600 dark:text-slate-300 shadow-sm group hover:border-indian-red/30 transition-colors animate-fade-in w-full box-border">
-                    <div class="flex items-center gap-2 overflow-hidden flex-1 cursor-pointer doc-open" data-filename="${esc}">
+                return `<div class="doc-pill flex items-center justify-between gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-2 rounded-xl text-[11px] font-semibold text-slate-600 dark:text-slate-300 shadow-sm group hover:border-indian-red/30 transition-colors animate-fade-in w-full box-border">
+                    <div class="flex items-center gap-2 overflow-hidden flex-1 cursor-pointer doc-open" data-filename="${esc}" title="${esc}">
                         ${getFileIcon(d)}
-                        <span class="truncate hover:text-indian-red transition-colors" title="${esc}">${esc}</span>
+                        <span class="doc-filename truncate hover:text-indian-red transition-colors">${esc}</span>
                     </div>
-                    <button class="flex-shrink-0 p-1 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all flex items-center justify-center doc-del" data-filename="${esc}" title="Remove ${esc}">
+                    <button class="doc-del flex-shrink-0 p-1 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all flex items-center justify-center" data-filename="${esc}" title="Remove ${esc}">
                         <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
                     </button>
                 </div>`;
@@ -716,8 +874,10 @@
             overlay.className = 'fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 md:p-10 animate-fade-in';
             overlay.onclick = (e) => { if (e.target === overlay) closeDocModal(); };
 
-            const fileUrl = api(`/api/sessions/${currentSessionId}/documents/${encodeURIComponent(filename)}`);
+            const fileUrl    = apiWithDataDir(`/api/sessions/${currentSessionId}/documents/${encodeURIComponent(filename)}`);
+            const previewUrl = apiWithDataDir(`/api/sessions/${currentSessionId}/documents/${encodeURIComponent(filename)}/preview`);
             const ext = (filename.split('.').pop() || '').toLowerCase();
+            const officeExts = ['docx', 'doc', 'pptx', 'ppt', 'xlsx', 'xls'];
 
             overlay.innerHTML = `
                 <div class="relative w-full max-w-5xl h-[85vh] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden animate-zoom-in">
@@ -748,15 +908,41 @@
             `;
             document.body.appendChild(overlay);
 
+            const area = document.getElementById('doc-modal-content-area');
+
             if (ext === 'pdf') {
-                document.getElementById('doc-modal-content-area').innerHTML = `<iframe src="${fileUrl}" class="w-full h-full rounded-lg border-none"></iframe>`;
+                area.innerHTML = `<iframe src="${fileUrl}" class="w-full h-full rounded-lg border-none"></iframe>`;
             } else if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(ext)) {
-                document.getElementById('doc-modal-content-area').innerHTML = `<div class="flex items-center justify-center h-full p-4"><img src="${fileUrl}" class="max-w-full max-h-full object-contain shadow-2xl rounded-lg"/></div>`;
+                area.innerHTML = `<div class="flex items-center justify-center h-full p-4"><img src="${fileUrl}" class="max-w-full max-h-full object-contain shadow-2xl rounded-lg"/></div>`;
+            } else if (officeExts.includes(ext)) {
+                // Server converts via LibreOffice; fetch as blob so we can show
+                // a helpful error if conversion fails (e.g. soffice not installed).
+                area.innerHTML = `<div class="flex flex-col items-center justify-center h-full gap-3 text-slate-500 dark:text-slate-400">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indian-red"></div>
+                    <p class="text-xs uppercase tracking-widest font-bold">Rendering preview…</p>
+                </div>`;
+                fetch(previewUrl).then(async (r) => {
+                    if (!r.ok) {
+                        const err = await r.json().catch(() => ({ detail: r.statusText }));
+                        area.innerHTML = `<div class="flex flex-col items-center justify-center h-full p-6 text-center gap-3">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-slate-400"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                            <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">Preview unavailable</p>
+                            <p class="text-xs font-mono text-slate-500 dark:text-slate-400 max-w-md">${escapeHtml(err.detail || 'Conversion failed')}</p>
+                            <a href="${fileUrl}" download="${escapeHtml(filename)}" class="mt-2 px-4 py-2 bg-indian-red text-white text-xs font-bold rounded-xl hover:opacity-90">Download original</a>
+                        </div>`;
+                        return;
+                    }
+                    const blob = await r.blob();
+                    const blobUrl = URL.createObjectURL(blob);
+                    area.innerHTML = `<iframe src="${blobUrl}" class="w-full h-full rounded-lg border-none"></iframe>`;
+                }).catch(err => {
+                    area.innerHTML = `<div class="text-red-500 p-6">Failed to load preview: ${escapeHtml(err.message)}</div>`;
+                });
             } else {
                 fetch(fileUrl).then(r => r.text()).then(text => {
-                    document.getElementById('doc-modal-content-area').innerHTML = `<pre class="p-6 text-sm font-mono text-slate-700 dark:text-slate-300 whitespace-pre-wrap h-full overflow-auto w-full">${text.replace(/</g, '&lt;')}</pre>`;
+                    area.innerHTML = `<pre class="p-6 text-sm font-mono text-slate-700 dark:text-slate-300 whitespace-pre-wrap h-full overflow-auto w-full">${text.replace(/</g, '&lt;')}</pre>`;
                 }).catch(() => {
-                    document.getElementById('doc-modal-content-area').innerHTML = `<div class="text-red-500 p-6">Failed to load.</div>`;
+                    area.innerHTML = `<div class="text-red-500 p-6">Failed to load.</div>`;
                 });
             }
         }
@@ -771,7 +957,7 @@
             if (!confirm(`Remove "${filename}" from this session?\n\nIts vectors will be deleted from the RAG index immediately.`)) return;
             try {
                 const res = await fetch(
-                    api(`/api/sessions/${currentSessionId}/documents/${encodeURIComponent(filename)}`),
+                    apiWithDataDir(`/api/sessions/${currentSessionId}/documents/${encodeURIComponent(filename)}`),
                     { method: 'DELETE' }
                 );
                 if (res.ok) {
@@ -786,7 +972,7 @@
         async function deleteSession(sid) {
             if (!confirm('Delete this session and all its documents?')) return;
             try {
-                await fetch(api(`/api/sessions/${sid}`), { method: 'DELETE' });
+                await fetch(apiWithDataDir(`/api/sessions/${sid}`), { method: 'DELETE' });
                 if (sid === currentSessionId) createNewSession();
                 else loadSessions();
             } catch (e) { console.error(e); }
@@ -796,7 +982,7 @@
             currentSessionId = sid;
             localStorage.setItem('last_session_id', sid);
             try {
-                const res  = await fetch(api(`/api/sessions/${sid}`));
+                const res  = await fetch(apiWithDataDir(`/api/sessions/${sid}`));
                 const data = await res.json();
                 const container = document.getElementById('messages');
                 container.innerHTML = '';
@@ -818,6 +1004,12 @@
 
         async function switchSession(sid) { await loadSessionHistory(sid); }
 
+        async function uploadFiles(files) {
+            for (const file of Array.from(files)) {
+                await uploadFile(file);
+            }
+        }
+
         async function uploadFile(file) {
             if (!file) return;
             // Reset file input so the same file can be re-uploaded
@@ -832,6 +1024,7 @@
             formData.append('api_key',         config.api_key);
             formData.append('model_name',      config.model_name);
             formData.append('embedding_model', config.embedding_model);
+            if (config.data_dir) formData.append('data_dir', config.data_dir);
 
             appendMessage('assistant', `Indexing **${file.name}**…`);
             try {
@@ -844,6 +1037,8 @@
 
         document.getElementById('chat-form').onsubmit = async (e) => {
             e.preventDefault();
+            if (isStreaming) return;
+
             const input = document.getElementById('message-input');
             const msg   = input.value.trim();
             if (!msg) return;
@@ -863,14 +1058,20 @@
                 </div>
             `);
 
+            isStreaming = true;
+            abortController = new AbortController();
+            updateSendStopBtn();
+
             let fullText = "";
             try {
                 const response = await fetch(api('/api/chat'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    signal: abortController.signal,
                     body: JSON.stringify({
                         session_id: currentSessionId,
                         message: msg,
+                        data_dir: config.data_dir || null,
                         config: {
                             provider:        config.provider,
                             base_url:        config.base_url,
@@ -901,7 +1102,22 @@
                     }
                 }
                 loadSessions();
-            } catch (err) { assistantMsgDiv.innerHTML = `<span class="text-red-500">Error: ${err.message}</span>`; }
+            } catch (err) {
+                if (err.name === 'AbortError') {
+                    if (fullText) {
+                        assistantMsgDiv.innerHTML = DOMPurify.sanitize(marked.parse(fullText))
+                            + '<p class="text-[11px] text-gray-400 dark:text-slate-500 mt-2 select-none">■ stopped</p>';
+                    } else {
+                        assistantMsgDiv.innerHTML = '<em class="text-gray-400 dark:text-slate-500">Response stopped.</em>';
+                    }
+                } else {
+                    assistantMsgDiv.innerHTML = `<span class="text-red-500">Error: ${err.message}</span>`;
+                }
+            } finally {
+                isStreaming = false;
+                abortController = null;
+                updateSendStopBtn();
+            }
         };
 
         function appendMessage(role, content) {
@@ -943,8 +1159,13 @@
             document.getElementById('settings-modal').classList.toggle('hidden');
         }
 
+        function toggleDocsModal() {
+            document.getElementById('docs-modal').classList.toggle('hidden');
+        }
+
         function updateConfigUI() {
             document.getElementById('config-backend').value  = config.backend_url || '';
+            document.getElementById('config-data-dir').value = config.data_dir || '';
             document.getElementById('config-provider').value = config.provider;
             document.getElementById('config-url').value      = config.base_url;
             document.getElementById('config-key').value      = config.api_key;
@@ -957,7 +1178,9 @@
         }
 
         function saveSettings() {
+            const prevDataDir = config.data_dir;
             config.backend_url     = document.getElementById('config-backend').value.trim();
+            config.data_dir        = document.getElementById('config-data-dir').value.trim();
             config.provider        = document.getElementById('config-provider').value;
             config.base_url        = document.getElementById('config-url').value.trim();
             config.api_key         = document.getElementById('config-key').value.trim();
@@ -965,6 +1188,11 @@
             config.embedding_model = document.getElementById('config-embed').value.trim();
             localStorage.setItem('app_config', JSON.stringify(config));
             toggleSettingsModal();
+            // If the data dir changed, reload sessions from the new location.
+            if (prevDataDir !== config.data_dir) {
+                loadSessions();
+                loadSessionHistory(currentSessionId);
+            }
         }
 
         function toggleDarkMode() {
