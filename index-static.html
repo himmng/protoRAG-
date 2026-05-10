@@ -598,9 +598,9 @@
                 <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
                     <h3 class="text-[11px] font-bold text-indian-red uppercase tracking-wider mb-2">Tips</h3>
                     <ul class="list-disc pl-5 space-y-1.5 text-[13px]">
-                        <li>If you change the embedding model in Settings, re-upload documents — old vectors won't match the new model.</li>
-                        <li>Supported formats: txt, csv, pdf, json, yaml, docx, xlsx, pptx, and more.</li>
-                        <li>Configure provider, models, and remote backend URL from the <b>Settings</b> panel.</li>
+                        <li>Supported formats: txt, md, csv, json, yaml, xml, html, pdf, docx. Other office formats (xlsx / pptx / doc) need the server-backed builds.</li>
+                        <li>Embeddings use the bundled <code class="bg-gray-200 dark:bg-slate-700 px-1 rounded">Xenova/all-MiniLM-L6-v2</code> — the Embedding Model field in Settings is ignored in this mode.</li>
+                        <li>All data is in <code class="bg-gray-200 dark:bg-slate-700 px-1 rounded">IndexedDB</code> on this device. Clearing site data wipes every session.</li>
                     </ul>
                 </div>
             </div>

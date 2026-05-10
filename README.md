@@ -1,168 +1,207 @@
 # protoRAG+
 
-protoRAG+ is a lightweight, local-first RAG (Retrieval-Augmented Generation) chat application.
-It lets you upload documents, index them locally with Chroma, and chat with an LLM using those documents as context.
-The UI is served from a static `index.html`, and the backend is a FastAPI app in `backend.py`.
+A lightweight RAG chat app for your own documents and your own LLM. Three deployment shapes share the same UI:
+
+| Mode | Where docs/embeddings live | Where the LLM call comes from | Best for |
+|------|----------------------------|-------------------------------|----------|
+| **B — Local-first** *(recommended)* | Your machine | Your local backend → your local Ollama | Private use; one user, full local control |
+| **A — Cloud-shared** | Your hosted backend | Hosted backend → user's tunneled Ollama | Multiple users sharing one frontend |
+| **C — Browser-only** | This browser (IndexedDB) | The browser itself → your local Ollama | Zero install on the server; static-host deploy |
+
+The same FastAPI backend (`backend.py`) serves modes A and B. Mode C is a separate file (`index-static.html`) that runs entirely in the browser — no server.
 
 ---
 
-## Features
+## Mode B — Local-first (recommended)
 
-- Local document storage and retrieval using Chroma
-- PDF and text document support
-- Session-based chat history stored on disk
-- Simple FastAPI backend with streaming responses
-- Pluggable LLM provider (e.g. Ollama-compatible / OpenAI-compatible APIs)
-- Docker image for easy deployment
+Everything stays on your machine. The frontend can be opened from disk, served locally, or hosted somewhere static (e.g. Netlify) — it talks to a backend running on your localhost.
 
----
+### With Docker
 
-## Requirements (non-Docker)
+```bash
+docker run -d --name protorag \
+  -p 8000:8000 \
+  -v ~/protorag-data:/app/data \
+  ghcr.io/himmng/protorag-:latest
+```
 
-- Python 3.10+
-- pip
-- An LLM endpoint compatible with the OpenAI API (e.g. Ollama with its `/v1` endpoint, OpenAI, or similar)
+Then open `http://localhost:8000`. In **Settings**:
 
-Install dependencies:
+- **Remote URL** → leave blank (same origin) or `http://localhost:8000` if you opened the UI from a different host
+- **LLM URL** → `http://localhost:11434` (Ollama)
+- **Provider** → Ollama, fill in your model names
+
+### Without Docker
 
 ```bash
 pip install -r requirements.txt
+python backend.py    # serves the UI at http://localhost:8000
+```
+
+The Ollama server must be running separately:
+
+```bash
+ollama pull gemma3
+ollama serve
+```
+
+### Stop / wipe
+
+```bash
+docker stop protorag && docker rm protorag    # stop the container
+rm -rf ~/protorag-data                        # wipe all sessions and embeddings
 ```
 
 ---
 
-## Running Locally (without Docker)
+## Mode A — Cloud backend + tunneled Ollama
 
-1. Install dependencies:
+For a publicly hosted backend that several users share. **Documents and embeddings live on the cloud backend, not the user's machine** — pick this only if you're OK with that trade-off.
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+### 1. Deploy the backend
 
-2. Start the backend:
+The repo includes [render.yaml](render.yaml) for a one-click Render deploy:
 
-   ```bash
-   python backend.py
-   ```
+1. Push the repo to GitHub.
+2. On Render: **New → Blueprint** → select the repo. Render reads `render.yaml`, generates a `PROTORAG_API_TOKEN`, and mounts a 5 GB persistent disk at `/app/data`.
+3. Copy the generated token from the env-vars page. Without it the public backend is open to anyone.
 
-3. Open the UI:
+The same Dockerfile works on Railway, Fly.io, etc. Just set `PROTORAG_API_TOKEN` to a long random string.
 
-   - The backend serves `index.html` from the project root at `http://localhost:8000/`.
-   - Ensure `index.html` is present alongside `backend.py`.
+### 2. Tunnel each user's local Ollama
 
-4. Configure the UI (in the Settings modal):
+Each end-user picks one:
 
-   - **Storage Path (Local)**: `./data` (or another directory)
-   - **Provider**: `ollama` or the appropriate provider name
-   - **Base URL**: the base URL of your LLM endpoint  
-     - For Ollama, typically: `http://localhost:11434/v1`
-   - **API Key**: as required by your provider (for local Ollama, usually a dummy value is fine)
-   - **LLM Model**: name of the chat model (e.g. `llama3`, `gpt-4o`, etc.)
-   - **Embedding Model**: name of the embedding model
+```bash
+cloudflared tunnel --url http://localhost:11434     # → https://*.trycloudflare.com
+tailscale serve 11434                               # → Tailscale magic-DNS URL
+ngrok http 11434                                    # → https://*.ngrok.app
+```
 
-By default, data is stored under `./data` (configurable via `DEFAULT_DATA_DIR` env var).
+### 3. Configure the frontend
 
----
+Open the deployed site (or any host running the same `index.html`) → **Settings**:
 
-## Secure LLM Inference over Tailscale
+- **Remote URL** → your backend (e.g. `https://protorag.onrender.com`)
+- **Backend Token** → the `PROTORAG_API_TOKEN` value from step 1
+- **LLM URL** → the user's tunnel URL from step 2
 
-You can expose your LLM server (e.g. Ollama or an OpenAI-compatible proxy) only on your Tailscale tailnet and point protoRAG+ at that private address.
+Click **Test** next to Remote URL — green dot = backend reachable.
 
-1. Install and log in to Tailscale on the machine running your LLM server.
-2. Run your LLM API bound to the Tailscale interface or localhost, for example for Ollama:
-
-   ```bash
-   OLLAMA_HOST=127.0.0.1:11434 ollama serve
-   ```
-
-3. From a Tailscale-connected client machine, find the server’s Tailscale IP or MagicDNS name, e.g. `100.x.y.z` or `llm-server.tailnet-name.ts.net`.
-4. In the protoRAG+ Settings modal on the client:
-
-   - **Provider**: `ollama` (or matching your server)
-   - **Base URL**: `http://llm-server.tailnet-name.ts.net:11434/v1` (or `http://100.x.y.z:11434/v1`)
-   - **API Key**: leave blank or dummy for Ollama, or set as required by your proxy.
-
-Only devices on your Tailscale tailnet will be able to reach the LLM endpoint, giving you a simple private network for secure inference.
+The token gates the backend; it does **not** gate the LLM tunnel. If you don't want strangers using your Ollama, also set `OLLAMA_HOST=127.0.0.1` and rely on the tunnel ACL.
 
 ---
 
-## Running with Docker
+## Mode C — Browser-only (no backend)
 
-A separate README (`README-docker.md`) contains details. The basic flow:
+A pure static site. Embeddings, retrieval, and chat all run in the browser; the LLM call goes browser-direct to local Ollama.
 
-1. Build the image:
+### 1. Allow CORS on Ollama
 
-   ```bash
-   docker build -t protorag:latest .
-   ```
+The browser-direct call is cross-origin, so Ollama needs to opt in:
 
-2. Run the container with a local data volume:
+```bash
+OLLAMA_ORIGINS='*' ollama serve
+```
 
-   ```bash
-   docker run \
-     --name protorag \
-     -p 127.0.0.1:8000:8000 \
-     -v /path/on/host:/app/data \
-     protorag:latest
-   ```
+- macOS GUI install: `launchctl setenv OLLAMA_ORIGINS '*'`, then restart Ollama.
+- Linux systemd user service: add `Environment="OLLAMA_ORIGINS=*"` to `~/.config/systemd/user/ollama.service` and reload.
 
-   - Inside the container, the app listens on `http://0.0.0.0:8000`.
-   - All documents, Chroma DB files, and histories live under `/app/data` in the container (mapped to `/path/on/host`).
+### 2. Open the page
 
-3. Inside the UI Settings (when running in Docker):
+Either of:
 
-   - **Storage Path (Local)**: `./data`
-   - Other fields as described in the local section, using your LLM endpoint (can be remote).
+```bash
+python3 -m http.server 8080         # then open http://localhost:8080/index-static.html
+```
 
----
+Or drop `index-static.html` into Netlify drag-drop, GitHub Pages, or any static host.
 
-## API Overview
+### 3. Configure Settings
 
-The FastAPI backend exposes a few main endpoints:
+- **LLM URL** → `http://localhost:11434`
+- **Provider** → Ollama
+- **LLM Model** → e.g. `gemma3`
+- The "Embedding Model" field is ignored — Mode C uses `Xenova/all-MiniLM-L6-v2` (~22 MB, downloaded once and cached).
 
-- `POST /api/upload`  
-  Upload and index a document for a given session.
+### Limits
 
-- `POST /api/chat`  
-  Stream chat responses for a session, optionally using retrieved document context.
-
-- `GET /api/sessions`  
-  List existing sessions (with preview and whether they have RAG docs).
-
-- `GET /api/sessions/{session_id}`  
-  Get chat history and document list for a session.
-
-- `DELETE /api/sessions/{session_id}`  
-  Delete a session and its data.
-
-- `GET /api/sessions/{session_id}/documents/{filename}`  
-  Download a stored document.
-
-- `POST /api/sessions/{session_id}/documents/{filename}/delete`  
-  Delete a document and rebuild the RAG index for remaining docs.
-
-- `GET /`  
-  Serve the `index.html` UI from the project root.
+- Only Ollama / LM Studio / OpenAI-compatible servers reachable from the browser.
+- File formats: text formats, PDF, DOCX. `.xlsx`/`.pptx`/`.doc` are not supported here — use Mode A or B for those.
+- Storage is per-browser. Switching browsers, clearing site data, or using private mode wipes everything.
 
 ---
 
-## Data Storage
+## Settings reference (the modal in the UI)
 
-- Default base directory: `./data` (override with `DEFAULT_DATA_DIR` environment variable).
-- Layout (per session):
-  - `data/db/session/<session_id>/` – Chroma DB and `history.json`
-  - `data/documents/session/<session_id>/` – uploaded documents
+| Field | Modes A/B | Mode C |
+|-------|-----------|--------|
+| **Remote URL** | URL of the FastAPI backend, blank for same-origin | not shown |
+| **Backend Token** | matches `PROTORAG_API_TOKEN` env var, if set | not shown |
+| **Data Storage Path** | path on the backend host (default `./data`) | not shown |
+| **LLM URL** | LLM endpoint reachable *from the backend* | LLM endpoint reachable *from this browser* |
+| **Provider** | ollama / lmstudio / openai / litellm / anthropic / custom | ollama / lmstudio / custom |
+| **API Key** | sent to the LLM provider | sent to the local LLM (don't paste real cloud keys here) |
+| **LLM Model** | the chat model name | same |
+| **Embedding Model** | the embedding model name | ignored — uses `Xenova/all-MiniLM-L6-v2` |
+
+---
+
+## API overview (Modes A and B)
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET`    | `/api/health` | unauthed liveness probe used by the **Test** button |
+| `POST`   | `/api/upload` | upload, chunk, embed, and index a document into a session |
+| `POST`   | `/api/chat` | stream a chat response, with retrieval if the session has documents |
+| `GET`    | `/api/sessions` | list sessions (preview + RAG flag) |
+| `GET`    | `/api/sessions/{id}` | get chat history and document list for a session |
+| `DELETE` | `/api/sessions/{id}` | delete a session and its data |
+| `GET`    | `/api/sessions/{id}/documents/{filename}` | download a stored document |
+| `GET`    | `/api/sessions/{id}/documents/{filename}/preview` | render office formats via LibreOffice |
+| `DELETE` | `/api/sessions/{id}/documents/{filename}` | delete a document and prune its vectors |
+| `GET`    | `/` | serve `index.html` |
+
+When `PROTORAG_API_TOKEN` is set, every `/api/*` route except `/api/health` requires the `X-API-Token` header. For `<img>`/`<iframe>`/download-anchor URLs (which can't carry headers), the backend also accepts `?token=` on GETs. CORS preflights are always allowed; a Private-Network-Access middleware lets HTTPS pages call `http://localhost:8000` without browser flags.
+
+---
+
+## Data layout (Modes A and B)
+
+Default base directory: `./data` (override with the `DEFAULT_DATA_DIR` env var, or per-request via the **Data Storage Path** field).
+
+```
+data/
+├── db/session/<session_id>/
+│   ├── chromadb/          # ChromaDB collection for this session
+│   ├── embed_meta.json    # embedding-model name (mismatch detection)
+│   └── history.json       # chat transcript
+└── documents/session/<session_id>/
+    └── <uploaded files>
+```
+
+In Mode C, the equivalent lives in IndexedDB (database `protorag`, stores `sessions` / `documents` / `chunks` / `messages`).
+
+---
+
+## Environment variables (server modes)
+
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `DEFAULT_DATA_DIR` | `./data` | Base directory for sessions, documents, vectors |
+| `PROTORAG_API_TOKEN` | unset | If set, all `/api/*` routes (except `/api/health`) require `X-API-Token` |
 
 ---
 
 ## Development
 
-To run the FastAPI app via `uvicorn` directly:
-
 ```bash
+# Auto-reload backend
 uvicorn backend:app --host 0.0.0.0 --port 8000 --reload
+
+# Smoke-test the static build
+python3 -m http.server 8080
+# → http://localhost:8080/index-static.html
 ```
 
-Ensure `index.html` is present in the project root so the UI is served at `/`.
-
----
+The Docker image is published by [.github/workflows/docker-publish.yml](.github/workflows/docker-publish.yml) on every push to `main` and on `v*` tags. Multi-arch (`linux/amd64` + `linux/arm64`) → `ghcr.io/himmng/protorag-:latest`.
