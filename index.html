@@ -375,8 +375,14 @@
                 <!-- Remote URL -->
                 <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
                     <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Remote URL (Leave blank when running locally)</label>
-                    <input id="config-backend" type="text" placeholder="use tailscale, cloudflared (blank = same origin)" class="w-full bg-white dark:bg-slate-800 p-3 rounded-xl outline-none border border-gray-200 dark:border-slate-700 focus:border-indian-red transition-all font-mono text-xs">
-                    <div class="text-[10px] text-gray-400 mt-1">Your tailscale, cloudflared tunnel for remote backend.</div>
+                    <div class="flex gap-2">
+                        <input id="config-backend" type="text" placeholder="use tailscale, cloudflared (blank = same origin)" class="flex-1 bg-white dark:bg-slate-800 p-3 rounded-xl outline-none border border-gray-200 dark:border-slate-700 focus:border-indian-red transition-all font-mono text-xs">
+                        <button type="button" onclick="testBackendConnection()" class="px-3 py-2 rounded-xl border border-gray-200 dark:border-slate-700 hover:border-indian-red text-xs font-bold text-gray-600 dark:text-slate-300 transition-all flex items-center gap-2 whitespace-nowrap">
+                            <span id="config-backend-dot" class="inline-block w-2 h-2 rounded-full bg-gray-300 dark:bg-slate-600"></span>
+                            Test
+                        </button>
+                    </div>
+                    <div id="config-backend-status" class="text-[10px] text-gray-400 mt-1">Your tailscale, cloudflared tunnel for remote backend, or <code class="bg-gray-200 dark:bg-slate-700 px-1 rounded">http://localhost:8000</code> when running the backend locally.</div>
                 </div>
 
                 <!-- Data Storage Path -->
@@ -480,6 +486,39 @@
                         protoRAG⁺ is a <b>dynamic RAG</b> system: each chat session has its own vector index that you can grow,
                         shrink, or empty at any time. Retrieval automatically engages or disengages based on whether the
                         session currently holds any documents — you never flip a mode switch yourself.
+                    </p>
+                </div>
+
+                <!-- Quick Start (Local) -->
+                <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                    <h3 class="text-[11px] font-bold text-indian-red uppercase tracking-wider mb-2">Quick Start — run locally with your own Ollama</h3>
+                    <p class="mb-3">
+                        Use the deployed website with <b>your own LLM and your own storage</b>. Run the backend on your machine
+                        in one command — your documents and embeddings stay on your disk; the backend talks to Ollama on
+                        <code class="bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-[11px]">localhost</code>.
+                    </p>
+                    <ol class="list-decimal pl-5 space-y-2 text-[13px]">
+                        <li>Install <a href="https://ollama.com/download" target="_blank" rel="noopener" class="text-indian-red underline">Ollama</a> and pull a model: <code class="bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-[11px]">ollama pull gemma3</code></li>
+                        <li>
+                            Start the protoRAG⁺ backend with Docker:
+                            <pre class="bg-gray-900 text-gray-100 dark:bg-slate-950 p-3 rounded-lg text-[11px] font-mono mt-1 overflow-x-auto">docker run -d --name protorag \
+  -p 8000:8000 \
+  -v ~/protorag-data:/app/data \
+  ghcr.io/himmng/protorag-:latest</pre>
+                        </li>
+                        <li>Open <b>Settings</b> on this page and set:
+                            <ul class="list-disc pl-5 mt-1 space-y-1">
+                                <li><b>Remote URL</b> → <code class="bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-[11px]">http://localhost:8000</code> (click <b>Test</b> to verify)</li>
+                                <li><b>Base URL</b> → <code class="bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-[11px]">http://localhost:11434</code></li>
+                                <li><b>Provider</b> → Ollama, then fill in your model names</li>
+                            </ul>
+                        </li>
+                        <li>Upload documents and chat. Everything stays on your machine — stop the container any time with <code class="bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-[11px]">docker stop protorag</code>.</li>
+                    </ol>
+                    <p class="text-[11px] text-gray-500 dark:text-slate-400 mt-3">
+                        No Docker? Clone the repo and run <code class="bg-gray-200 dark:bg-slate-700 px-1 rounded">pip install -r requirements.txt &amp;&amp; python backend.py</code> instead.
+                        On Chrome, if the <b>Test</b> button fails, enable <i>Insecure origins treated as secure</i> for the site at
+                        <code class="bg-gray-200 dark:bg-slate-700 px-1 rounded">chrome://flags</code>, or use Firefox.
                     </p>
                 </div>
 
@@ -1157,6 +1196,34 @@
 
         function toggleSettingsModal() {
             document.getElementById('settings-modal').classList.toggle('hidden');
+        }
+
+        async function testBackendConnection() {
+            const dot    = document.getElementById('config-backend-dot');
+            const status = document.getElementById('config-backend-status');
+            const raw    = document.getElementById('config-backend').value.trim().replace(/\/$/, '');
+            const target = (raw || window.location.origin) + '/api/health';
+
+            dot.className = 'inline-block w-2 h-2 rounded-full bg-yellow-400 animate-pulse';
+            status.textContent = 'Checking ' + target + '…';
+            status.className = 'text-[10px] text-gray-400 mt-1';
+
+            try {
+                const ctrl  = new AbortController();
+                const timer = setTimeout(() => ctrl.abort(), 5000);
+                const res   = await fetch(target, { signal: ctrl.signal });
+                clearTimeout(timer);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json().catch(() => ({}));
+                dot.className = 'inline-block w-2 h-2 rounded-full bg-green-500';
+                status.textContent = 'Connected — ' + (data.service || 'backend reachable');
+                status.className = 'text-[10px] text-green-600 dark:text-green-400 mt-1';
+            } catch (err) {
+                dot.className = 'inline-block w-2 h-2 rounded-full bg-red-500';
+                const msg = err.name === 'AbortError' ? 'timeout (5s)' : (err.message || 'unreachable');
+                status.textContent = 'Cannot reach ' + target + ' — ' + msg;
+                status.className = 'text-[10px] text-red-600 dark:text-red-400 mt-1';
+            }
         }
 
         function toggleDocsModal() {

@@ -28,6 +28,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def _private_network_access(request, call_next):
+    # Chrome's Private Network Access blocks HTTPS pages from calling
+    # http://localhost backends unless the preflight reply opts in. This
+    # makes Mode B (Netlify frontend → local backend) work without flags.
+    if request.method == "OPTIONS" and request.headers.get("access-control-request-private-network"):
+        from starlette.responses import Response
+        resp = Response(status_code=204)
+        resp.headers["Access-Control-Allow-Private-Network"] = "true"
+        resp.headers["Access-Control-Allow-Origin"] = request.headers.get("origin", "*")
+        resp.headers["Access-Control-Allow-Methods"] = "*"
+        resp.headers["Access-Control-Allow-Headers"] = request.headers.get("access-control-request-headers", "*")
+        return resp
+    return await call_next(request)
+
 DATA_DIR = os.environ.get("DEFAULT_DATA_DIR", "./data")
 MAX_HISTORY_ENTRIES = 200
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
@@ -1017,6 +1033,11 @@ def _flush_session_vectorstores():
 
 
 # ── UI ────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/health")
+def health():
+    return {"status": "ok", "service": "protoRAG+"}
+
 
 @app.get("/")
 def get_ui():
