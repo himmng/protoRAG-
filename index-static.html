@@ -1,0 +1,1640 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>protoRAG⁺</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='20 15 60 60'%3E%3Cpath d='M50 15C58 15 65 22 65 30C73 30 80 37 80 45C80 53 73 60 65 60C65 68 58 75 50 75C42 75 35 68 35 60C27 60 20 53 20 45C20 37 27 30 35 30C35 22 42 15 50 15Z' fill='%23CD5C5C'/%3E%3Ccircle cx='50' cy='45' r='8' fill='%23CD5C5C' stroke='white' stroke-width='2'/%3E%3C/svg%3E">
+
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: { 'indian-red': '#CD5C5C' }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root { --indian-red: #CD5C5C; }
+
+        html { -webkit-text-size-adjust: 100%; }
+
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .dark ::-webkit-scrollbar-thumb { background: #334155; }
+
+        body, aside, main, div, button, textarea {
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+        }
+
+        /* ── Sidebar transitions ───────────────────────────────────────── */
+        #sidebar {
+            transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                        transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .sidebar-expanded  { width: 280px; }
+        .sidebar-collapsed { width: 72px; }
+
+        /* On mobile the sidebar slides in/out as an overlay */
+        @media (max-width: 767px) {
+            #sidebar {
+                position: fixed;
+                top: 0; left: 0; bottom: 0;
+                width: 280px !important;   /* always full width when open */
+                transform: translateX(-100%);
+                z-index: 40;
+            }
+            #sidebar.mobile-open { transform: translateX(0); }
+            #sidebar-backdrop {
+                display: none;
+                position: fixed; inset: 0;
+                background: rgba(0,0,0,0.45);
+                z-index: 39;
+            }
+            #sidebar.mobile-open ~ #sidebar-backdrop { display: block; }
+        }
+
+        .logo-container { transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .sidebar-collapsed .logo-container { transform: rotate(180deg); }
+
+        .arrow-icon { transition: transform 0.4s ease; }
+        .sidebar-collapsed .arrow-icon { transform: rotate(180deg); }
+
+        .nav-text {
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            white-space: nowrap;
+        }
+        .sidebar-collapsed .nav-text { opacity: 0; transform: translateX(-10px); pointer-events: none; }
+
+        .sidebar-collapsed .new-chat-btn span { display: none; }
+        .sidebar-collapsed .new-chat-btn { justify-content: center; padding: 10px; }
+        .sidebar-collapsed .bottom-btn span { display: none; }
+        .sidebar-collapsed .bottom-btn { justify-content: center; }
+
+        /* ── Animations ────────────────────────────────────────────────── */
+        .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        .animate-zoom-in { animation: zoomIn 0.2s ease-out forwards; }
+        @keyframes zoomIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+
+        .animate-fade-out { animation: fadeOut 0.2s ease-out forwards; }
+        @keyframes fadeOut { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.95); } }
+
+        @keyframes gear-rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .animate-gear { animation: gear-rotate 2.5s linear infinite; }
+
+        .loading-dots:after {
+            content: '.';
+            animation: dots 1.5s steps(5, end) infinite;
+        }
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40%      { content: '..'; }
+            60%      { content: '...'; }
+            80%, 100%{ content: ''; }
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .provider-hint {
+            font-size: 10px;
+            font-family: monospace;
+            background: rgba(205,92,92,0.1);
+            color: #CD5C5C;
+            border-radius: 6px;
+            padding: 2px 7px;
+            margin-top: 5px;
+            display: inline-block;
+            letter-spacing: 0.01em;
+        }
+        .dark .provider-hint { background: rgba(205,92,92,0.18); }
+
+        /* ── Sidebar Documents section ─────────────────────────────────── */
+        #sidebar-docs { transition: opacity 0.2s ease; }
+        .sidebar-collapsed #sidebar-docs .docs-header,
+        .sidebar-collapsed #sidebar-docs .doc-filename,
+        .sidebar-collapsed #sidebar-docs .doc-del { display: none; }
+        .sidebar-collapsed #sidebar-docs .doc-pill {
+            justify-content: center;
+            padding: 8px;
+        }
+        .sidebar-collapsed #sidebar-docs .doc-pill .doc-open {
+            justify-content: center;
+            flex: none;
+        }
+
+        /* ── Input area responsive fixes ──────────────────────────────── */
+        #input-wrapper {
+            width: 100%;
+            max-width: 56rem;
+            padding: 0 1rem;
+            box-sizing: border-box;
+        }
+        @media (min-width: 768px) {
+            #input-wrapper {
+                padding: 0 2rem;
+            }
+        }
+
+        /* Make the chat messages area use the full available width */
+        #chat-container { padding-bottom: 10rem; }
+
+        /* ── Mobile hamburger button ──────────────────────────────────── */
+        #mobile-menu-btn {
+            display: none;
+        }
+        @media (max-width: 767px) {
+            #mobile-menu-btn { display: flex; }
+            /* On mobile hide the desktop collapse arrows */
+            #desktop-toggle { display: none; }
+        }
+
+        /* ── @mention autocomplete popup ──────────────────────────────── */
+        #at-mention-popup {
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.13);
+            overflow: hidden;
+            z-index: 100;
+            animation: fadeIn 0.15s ease-out;
+            max-height: 220px;
+            overflow-y: auto;
+        }
+        .dark #at-mention-popup {
+            background: #1e293b;
+            border-color: #334155;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+        .at-mention-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            color: #374151;
+            border-bottom: 1px solid #f1f5f9;
+            transition: background 0.1s;
+        }
+        .dark .at-mention-item { color: #cbd5e1; border-bottom-color: #1e293b; }
+        .at-mention-item:last-child { border-bottom: none; }
+        .at-mention-item:hover, .at-mention-item.selected {
+            background: rgba(205,92,92,0.08);
+            color: #CD5C5C;
+        }
+        .dark .at-mention-item:hover, .dark .at-mention-item.selected {
+            background: rgba(205,92,92,0.15);
+        }
+        .at-mention-item .at-badge {
+            font-size: 10px;
+            font-weight: 700;
+            background: rgba(205,92,92,0.12);
+            color: #CD5C5C;
+            border-radius: 5px;
+            padding: 1px 6px;
+            letter-spacing: 0.03em;
+        }
+
+        /* ── @mention pill tags inside the textarea area ─────────────── */
+        .at-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(205,92,92,0.12);
+            color: #CD5C5C;
+            border-radius: 20px;
+            padding: 2px 8px 2px 6px;
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body class="bg-white dark:bg-slate-950 text-gray-900 dark:text-slate-100 font-sans h-screen flex overflow-hidden">
+
+    <!-- Mobile sidebar backdrop -->
+    <div id="sidebar-backdrop" onclick="closeMobileSidebar()"></div>
+
+    <!-- ── Sidebar ─────────────────────────────────────────────────────── -->
+    <aside id="sidebar" class="sidebar-expanded relative z-30 h-full bg-gray-50 dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 flex flex-col shadow-sm">
+        <div class="p-4 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between overflow-hidden">
+            <div class="flex items-center gap-3 cursor-pointer" onclick="toggleSidebar()">
+                <div class="logo-container flex-shrink-0">
+                    <svg width="36" height="36" viewBox="0 0 100 100" fill="none">
+                        <path d="M50 15C58 15 65 22 65 30C73 30 80 37 80 45C80 53 73 60 65 60C65 68 58 75 50 75C42 75 35 68 35 60C27 60 20 53 20 45C20 37 27 30 35 30C35 22 42 15 50 15Z" fill="#CD5C5C"/>
+                        <circle cx="50" cy="45" r="8" fill="#CD5C5C" stroke="white" stroke-width="2"/>
+                    </svg>
+                </div>
+                <span class="nav-text font-bold text-xl tracking-tight text-[#CD5C5C]">protoRAG⁺</span>
+            </div>
+            <button id="desktop-toggle" onclick="toggleSidebar()" class="nav-text p-1.5 rounded-lg text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-800 transition-colors">
+                <svg class="arrow-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="11 17 6 12 11 7"></polyline>
+                    <polyline points="18 17 13 12 18 7"></polyline>
+                </svg>
+            </button>
+        </div>
+
+        <div class="p-3">
+            <button onclick="createNewSession()" class="new-chat-btn w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-200 py-2.5 px-4 rounded-xl hover:shadow-md dark:hover:bg-slate-700 flex items-center gap-3 transition-all font-medium">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                <span class="nav-text">New Chat</span>
+            </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto px-3 space-y-1 py-2 min-h-0" id="session-list"></div>
+
+        <!-- Documents section — appears only when the current session has docs -->
+        <div id="sidebar-docs" class="hidden border-t border-gray-200 dark:border-slate-800 flex-shrink-0">
+            <div class="docs-header px-4 pt-3 pb-1.5 flex items-center justify-between">
+                <span class="nav-text text-[10px] font-bold text-gray-400 uppercase tracking-widest">Documents (preview by clicking)</span>
+                <button onclick="document.getElementById('file-input').click()"
+                        class="nav-text p-1 rounded-md text-gray-400 hover:text-indian-red hover:bg-indian-red/10 transition-colors"
+                        title="Add document">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="doc-pills" class="px-3 pb-3 space-y-1 overflow-y-auto" style="max-height: 40vh"></div>
+        </div>
+
+        <div class="p-3 border-t border-gray-200 dark:border-slate-800">
+            <button onclick="toggleSettingsModal()" class="bottom-btn flex items-center gap-4 w-full p-2.5 rounded-xl text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-800 transition-all overflow-hidden group">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0 group-hover:rotate-90 transition-transform duration-500">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+                <span class="nav-text text-sm font-medium">Settings</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- ── Main ────────────────────────────────────────────────────────── -->
+    <main class="flex-1 flex flex-col h-full relative bg-white dark:bg-slate-950 min-w-0">
+
+        <!-- Top-right controls -->
+        <div class="absolute top-3 right-4 z-40 flex items-center gap-2">
+            <button onclick="toggleDocsModal()" title="Documentation" class="p-2.5 bg-white/80 dark:bg-slate-800/80 backdrop-blur border border-gray-200 dark:border-slate-700 rounded-full shadow-lg hover:scale-110 transition-all text-indian-red">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path><line x1="9" y1="7" x2="16" y2="7"></line><line x1="9" y1="11" x2="16" y2="11"></line></svg>
+            </button>
+            <button onclick="toggleDarkMode()" class="p-2.5 bg-white/80 dark:bg-slate-800/80 backdrop-blur border border-gray-200 dark:border-slate-700 rounded-full shadow-lg hover:scale-110 transition-all">
+                <svg id="theme-sun" class="block dark:hidden text-orange-500" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+                <svg id="theme-moon" class="hidden dark:block text-blue-400" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            </button>
+        </div>
+
+        <!-- Mobile hamburger -->
+        <button id="mobile-menu-btn" onclick="openMobileSidebar()" class="absolute top-3 left-4 z-40 p-2.5 bg-white/80 dark:bg-slate-800/80 backdrop-blur border border-gray-200 dark:border-slate-700 rounded-full shadow-lg hover:scale-110 transition-all items-center justify-center">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+
+        <!-- Chat Area -->
+        <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-8 pt-20">
+            <div class="max-w-3xl mx-auto space-y-20 pb-44" id="messages"></div>
+        </div>
+
+        <!-- Bottom Input Area — fully responsive -->
+        <div class="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-white dark:from-slate-950 via-white/95 dark:via-slate-950/95 to-transparent pt-8 pb-safe pb-4 z-20"
+             style="padding-bottom: max(1rem, env(safe-area-inset-bottom));">
+            <div id="input-wrapper" class="mx-auto">
+
+                <!-- Row: upload button + textarea -->
+                <div class="flex items-end gap-2">
+
+                    <!-- Upload button — icon-only on mobile, label on md+ -->
+                    <button onclick="document.getElementById('file-input').click()"
+                            class="group relative flex-shrink-0 flex items-center justify-center gap-2 px-3 md:px-4 py-3 mb-1 bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-400 rounded-2xl border border-gray-300 dark:border-slate-700 shadow-sm hover:text-indian-red hover:border-indian-red/50 transition-colors"
+                            title="Upload Document">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="13" x2="12" y2="17"></line><line x1="10" y1="15" x2="14" y2="15"></line></svg>
+                        <span class="hidden md:inline text-sm font-semibold whitespace-nowrap">Upload Docs</span>
+                        <!-- Tooltip -->
+                        <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-44 p-2 bg-gray-800 dark:bg-slate-700 text-white text-[10px] rounded-lg shadow-xl z-50 pointer-events-none">
+                            <p class="font-bold mb-1 border-b border-gray-600 pb-1">Supported Formats:</p>
+                            <p>txt, csv, pdf, json/l, yaml, docx, pptx, xlsx etc.</p>
+                            <div class="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-gray-800 dark:border-t-slate-700"></div>
+                        </div>
+                    </button>
+
+                    <!-- Textarea form -->
+                    <form id="chat-form" class="flex-1 relative flex items-end bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-[2rem] shadow-2xl px-4 py-2 ring-1 ring-black/5 min-w-0">
+                        <!-- @mention autocomplete popup -->
+                        <div id="at-mention-popup" class="hidden"></div>
+                        <textarea id="message-input" rows="1" placeholder="Message… use @filename to target a document"
+                                  class="flex-1 max-h-48 py-3 px-2 bg-transparent outline-none resize-none text-gray-800 dark:text-slate-100 text-sm md:text-base"
+                                  oninput="autoResizeTextArea(this); handleAtMention(this);"
+                                  onkeydown="handleAtMentionKey(event)"></textarea>
+                        <button id="send-stop-btn" type="button" title="Send message" class="p-2.5 bg-indian-red text-white rounded-full hover:scale-105 transition-all shadow-lg mb-1 flex-shrink-0">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Disclaimer — hidden on mobile to save space -->
+                <div class="hidden md:flex items-center justify-between text-[11px] text-gray-500 dark:text-slate-400 mt-2 px-2 select-none">
+                    <span><b>Disclaimer:</b> protoRAG⁺ can make mistakes.</span>
+                    <span><b>Tip:</b> Type <b>@filename</b> to target a document &nbsp;·&nbsp; <b>Shift+Enter</b> for new line</span>
+                </div>
+            </div>
+        </div>
+
+        <input type="file" id="file-input" class="hidden" multiple onchange="uploadFiles(this.files)">
+    </main>
+
+    <!-- ── Settings Modal ──────────────────────────────────────────────── -->
+    <div id="settings-modal" class="hidden fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg shadow-2xl border border-gray-200 dark:border-slate-800 overflow-hidden animate-zoom-in">
+            <div class="p-6 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center">
+                <div>
+                    <h2 class="text-xl font-bold">Settings</h2>
+                    <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Configuration & Storage</p>
+                </div>
+                <button onclick="toggleSettingsModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl font-light">&times;</button>
+            </div>
+
+            <div class="p-6 space-y-5 max-h-[70vh] overflow-y-auto no-scrollbar">
+
+                <!-- Browser-only mode banner -->
+                <div class="bg-indian-red/5 dark:bg-indian-red/10 p-4 rounded-2xl border border-indian-red/20">
+                    <div class="flex gap-3 items-start">
+                        <span class="text-indian-red text-base leading-none mt-0.5">●</span>
+                        <div>
+                            <p class="text-[11px] font-bold text-indian-red uppercase tracking-wider">Browser-only mode</p>
+                            <p class="text-[12px] text-gray-600 dark:text-slate-400 mt-1">No backend. Documents, embeddings, and chat history live in this browser (IndexedDB). The page calls your local LLM directly. Clear site data to wipe everything.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Provider & Key -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 ml-1">Provider</label>
+                        <select id="config-provider" onchange="onProviderChange(this.value)"
+                                class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red text-sm">
+                            <option value="ollama">Ollama</option>
+                            <option value="lmstudio">LM Studio</option>
+                            <option value="custom">Custom (OpenAI-compatible)</option>
+                        </select>
+                        <div id="provider-hint" class="provider-hint mt-1"></div>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 ml-1">API Key</label>
+                        <input id="config-key" type="password" placeholder="none for Ollama / LM Studio" class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red text-sm">
+                        <div class="text-[10px] text-gray-400 mt-1 ml-1">Sent to your local LLM server. Don't paste real cloud-API keys here — they'd be visible to anyone using this browser.</div>
+                    </div>
+                </div>
+
+                <!-- Models -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 ml-1">LLM Model</label>
+                        <input id="config-model" type="text" placeholder="e.g. gemma-4-e4b:latest" class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 ml-1">Embedding Model</label>
+                        <input id="config-embed" type="text" placeholder="e.g. embeddinggemma:latest" class="w-full bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red text-sm">
+                    </div>
+                </div>
+
+                <!-- LLM URL -->
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 ml-1">LLM URL</label>
+                    <div class="flex gap-2">
+                        <input id="config-url" type="text" class="flex-1 bg-gray-50 dark:bg-slate-800 p-3 rounded-xl outline-none border border-transparent focus:border-indian-red text-sm font-mono">
+                        <button type="button" onclick="testLlmConnection()" class="px-3 py-2 rounded-xl border border-gray-200 dark:border-slate-700 hover:border-indian-red text-xs font-bold text-gray-600 dark:text-slate-300 transition-all flex items-center gap-2 whitespace-nowrap">
+                            <span id="config-llm-dot" class="inline-block w-2 h-2 rounded-full bg-gray-300 dark:bg-slate-600"></span>
+                            Test
+                        </button>
+                    </div>
+                    <div id="config-llm-status" class="text-[10px] text-gray-400 mt-1 ml-1"></div>
+                    <div id="url-hint" class="text-[10px] text-gray-400 mt-1 ml-1"></div>
+                </div>
+
+                <!-- Provider cheat-sheet -->
+                <div class="bg-gray-50 dark:bg-slate-800/40 rounded-2xl border border-gray-100 dark:border-slate-800 p-4">
+                    <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3">Provider quick-reference</p>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-[11px] text-gray-500 dark:text-slate-400 min-w-[360px]">
+                            <thead><tr class="border-b border-gray-200 dark:border-slate-700">
+                                <th class="text-left pb-1 font-bold">Provider</th>
+                                <th class="text-left pb-1 font-bold">Default base URL</th>
+                                <th class="text-left pb-1 font-bold">API key</th>
+                            </tr></thead>
+                            <tbody class="font-mono">
+                                <tr><td class="py-1 pr-2">Ollama</td><td class="py-1 pr-2">http://localhost:11434</td><td class="py-1">none</td></tr>
+                                <tr><td class="py-1 pr-2">LM Studio</td><td class="py-1 pr-2">http://localhost:1234/v1</td><td class="py-1">lm-studio</td></tr>
+                                <tr><td class="py-1 pr-2">Custom</td><td class="py-1 pr-2">your endpoint</td><td class="py-1">as needed</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-[10px] text-gray-400 mt-3">
+                        ℹ️ Embeddings are computed in the browser via <code class="bg-gray-200 dark:bg-slate-700 px-1 rounded">all-MiniLM-L6-v2</code> (~22 MB cached on first use). The Embedding Model field above is ignored in this mode.
+                    </p>
+                </div>
+            </div>
+
+            <div class="p-6 bg-gray-50 dark:bg-slate-800/50 flex justify-end gap-3 border-t border-gray-100 dark:border-slate-800">
+                <button onclick="toggleSettingsModal()" class="px-5 py-2.5 rounded-xl font-bold text-sm text-gray-500 hover:text-gray-700 transition-colors">Cancel</button>
+                <button onclick="saveSettings()" class="bg-indian-red text-white px-8 py-2.5 rounded-xl font-bold shadow-lg hover:brightness-110 active:scale-95 transition-all text-sm">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Documentation Modal ─────────────────────────────────────────── -->
+    <div id="docs-modal" class="hidden fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4" onclick="if(event.target===this) toggleDocsModal()">
+        <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-2xl shadow-2xl border border-gray-200 dark:border-slate-800 overflow-hidden animate-zoom-in">
+            <div class="p-6 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center">
+                <div>
+                    <h2 class="text-xl font-bold">Documentation</h2>
+                    <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">How protoRAG⁺ works</p>
+                </div>
+                <button onclick="toggleDocsModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl font-light">&times;</button>
+            </div>
+
+            <div class="p-6 space-y-5 max-h-[70vh] overflow-y-auto no-scrollbar text-sm text-gray-700 dark:text-slate-300 leading-relaxed">
+
+                <!-- What is dynamic RAG -->
+                <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                    <h3 class="text-[11px] font-bold text-indian-red uppercase tracking-wider mb-2">Dynamic RAG</h3>
+                    <p>
+                        protoRAG⁺ is a <b>dynamic RAG</b> system: each chat session has its own vector index that you can grow,
+                        shrink, or empty at any time. Retrieval automatically engages or disengages based on whether the
+                        session currently holds any documents — you never flip a mode switch yourself.
+                    </p>
+                </div>
+
+                <!-- Browser-only Quick Start -->
+                <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                    <h3 class="text-[11px] font-bold text-indian-red uppercase tracking-wider mb-2">Quick Start — browser-only mode</h3>
+                    <p class="mb-3">
+                        This page runs <b>entirely in your browser</b>. Documents, embeddings, and chat history live in IndexedDB
+                        on this device; the page calls your local LLM directly. No server installation required — but Ollama
+                        must allow cross-origin requests from this origin.
+                    </p>
+                    <ol class="list-decimal pl-5 space-y-2 text-[13px]">
+                        <li>
+                            Install <a href="https://ollama.com/download" target="_blank" rel="noopener" class="text-indian-red underline">Ollama</a>
+                            and pull a model: <code class="bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-[11px]">ollama pull gemma3</code>.
+                        </li>
+                        <li>
+                            Start Ollama with this origin allowed:
+                            <pre class="bg-gray-900 text-gray-100 dark:bg-slate-950 p-3 rounded-lg text-[11px] font-mono mt-1 overflow-x-auto">OLLAMA_ORIGINS='*' ollama serve</pre>
+                            <span class="text-[11px] text-gray-500 dark:text-slate-400">
+                                On macOS GUI installs: <code class="bg-gray-200 dark:bg-slate-700 px-1 rounded">launchctl setenv OLLAMA_ORIGINS '*'</code>, then restart Ollama.
+                                On Linux systemd: add <code class="bg-gray-200 dark:bg-slate-700 px-1 rounded">Environment="OLLAMA_ORIGINS=*"</code> to <code class="bg-gray-200 dark:bg-slate-700 px-1 rounded">~/.config/systemd/user/ollama.service</code> and reload.
+                            </span>
+                        </li>
+                        <li>Open <b>Settings</b> on this page and set:
+                            <ul class="list-disc pl-5 mt-1 space-y-1">
+                                <li><b>LLM URL</b> → <code class="bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-[11px]">http://localhost:11434</code> (click <b>Test</b> to verify)</li>
+                                <li><b>LLM Model</b> → the model you pulled, e.g. <code class="bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-[11px]">gemma3</code></li>
+                            </ul>
+                        </li>
+                        <li>Upload documents and chat. The first upload triggers a one-time ~22 MB download of the embedding model (cached after).</li>
+                    </ol>
+                    <p class="text-[11px] text-gray-500 dark:text-slate-400 mt-3">
+                        <b>Limits:</b> only Ollama / LM Studio / OpenAI-compatible servers reachable from your browser.
+                        Office formats other than .docx are not supported in browser-only mode (<code class="bg-gray-200 dark:bg-slate-700 px-1 rounded">.xlsx / .pptx / .doc</code>) — for those use the server-backed builds.
+                        Chat history and documents are tied to this browser; switching browsers / clearing site data wipes them.
+                    </p>
+                </div>
+
+                <!-- 1. Session modes -->
+                <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                    <h3 class="text-[11px] font-bold text-indian-red uppercase tracking-wider mb-3">1 · Session lifecycle</h3>
+                    <div class="space-y-3">
+                        <div class="flex gap-3">
+                            <span class="flex-shrink-0 w-2 h-2 mt-2 rounded-full bg-indian-red"></span>
+                            <p>
+                                A new session starts in <b>chat-only</b> mode. Messages go straight to the LLM with no
+                                retrieval — useful for plain conversation, brainstorming, or coding help.
+                            </p>
+                        </div>
+                        <div class="flex gap-3">
+                            <span class="flex-shrink-0 w-2 h-2 mt-2 rounded-full bg-indian-red"></span>
+                            <p>
+                                The moment you upload your <b>first document</b>, the session promotes itself to
+                                <b>RAG mode</b>. Every subsequent question is answered using context retrieved from your
+                                documents.
+                            </p>
+                        </div>
+                        <div class="flex gap-3">
+                            <span class="flex-shrink-0 w-2 h-2 mt-2 rounded-full bg-indian-red"></span>
+                            <p>
+                                Delete documents one by one and the index shrinks live. Once <b>all</b> documents are removed,
+                                the session quietly drops back to <b>chat-only</b> mode — same chat, same history, no retrieval.
+                            </p>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-gray-500 dark:text-slate-400 mt-3 italic">
+                        The chat / RAG indicator next to each session in the sidebar reflects this state.
+                    </p>
+                </div>
+
+                <!-- 2. Document workflow -->
+                <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                    <h3 class="text-[11px] font-bold text-indian-red uppercase tracking-wider mb-3">2 · Document workflow</h3>
+                    <div class="space-y-3">
+                        <div class="flex gap-3">
+                            <span class="flex-shrink-0 w-2 h-2 mt-2 rounded-full bg-indian-red"></span>
+                            <p>
+                                <b>Upload one at a time</b> or <b>select many files at once</b> — both work. Files are chunked,
+                                embedded, and appended to the session's vector store on the fly.
+                            </p>
+                        </div>
+                        <div class="flex gap-3">
+                            <span class="flex-shrink-0 w-2 h-2 mt-2 rounded-full bg-indian-red"></span>
+                            <p>
+                                <b>Add more anytime.</b> New uploads merge into the existing index without rebuilding —
+                                ask questions immediately after.
+                            </p>
+                        </div>
+                        <div class="flex gap-3">
+                            <span class="flex-shrink-0 w-2 h-2 mt-2 rounded-full bg-indian-red"></span>
+                            <p>
+                                <b>Delete individually</b> from the document list and only that file's chunks are removed
+                                from the index. Other documents stay searchable.
+                            </p>
+                        </div>
+                        <div class="flex gap-3">
+                            <span class="flex-shrink-0 w-2 h-2 mt-2 rounded-full bg-indian-red"></span>
+                            <p>
+                                Use <code class="bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-[11px]">@filename</code>
+                                in your message to restrict retrieval to specific documents in the session.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Isolation -->
+                <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                    <h3 class="text-[11px] font-bold text-indian-red uppercase tracking-wider mb-2">3 · Per-session isolation</h3>
+                    <p>
+                        Every session has its own vector collection and document folder under
+                        <code class="bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-[11px]">./data/</code>. Documents
+                        uploaded in one session are never visible to another — switch sessions to switch corpora.
+                    </p>
+                </div>
+
+                <!-- 4. Tips -->
+                <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                    <h3 class="text-[11px] font-bold text-indian-red uppercase tracking-wider mb-2">Tips</h3>
+                    <ul class="list-disc pl-5 space-y-1.5 text-[13px]">
+                        <li>If you change the embedding model in Settings, re-upload documents — old vectors won't match the new model.</li>
+                        <li>Supported formats: txt, csv, pdf, json, yaml, docx, xlsx, pptx, and more.</li>
+                        <li>Configure provider, models, and remote backend URL from the <b>Settings</b> panel.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="p-6 bg-gray-50 dark:bg-slate-800/50 flex justify-end border-t border-gray-100 dark:border-slate-800">
+                <button onclick="toggleDocsModal()" class="bg-indian-red text-white px-8 py-2.5 rounded-xl font-bold shadow-lg hover:brightness-110 active:scale-95 transition-all text-sm">Got it</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        /* =================================================================
+         * protoRAG+ — Mode C (browser-only)
+         *
+         * Everything below runs in the user's browser:
+         *   • Embeddings  → @xenova/transformers (Xenova/all-MiniLM-L6-v2)
+         *   • Vector store→ IndexedDB + cosine on the JS array (top-k)
+         *   • Chunking    → port of LangChain RecursiveCharacterTextSplitter
+         *   • Extraction  → text formats (TextDecoder), PDF (pdfjs), DOCX (mammoth)
+         *   • LLM         → OpenAI-compatible /chat/completions, streamed direct
+         * The page never talks to a server.
+         * ============================================================== */
+        import { pipeline, env as txEnv } from 'https://esm.sh/@xenova/transformers@2.17.2';
+        txEnv.allowLocalModels = false;
+        txEnv.useBrowserCache  = true;
+
+        let _pdfjs = null;
+        async function loadPdfjs() {
+            if (_pdfjs) return _pdfjs;
+            const mod = await import('https://esm.sh/pdfjs-dist@4.7.76/build/pdf.mjs');
+            mod.GlobalWorkerOptions.workerSrc = 'https://esm.sh/pdfjs-dist@4.7.76/build/pdf.worker.mjs';
+            _pdfjs = mod;
+            return mod;
+        }
+        let _mammoth = null;
+        async function loadMammoth() {
+            if (_mammoth) return _mammoth;
+            const mod = await import('https://esm.sh/mammoth@1.8.0');
+            _mammoth = mod.default || mod;
+            return _mammoth;
+        }
+
+        const PROVIDER_DEFAULTS = {
+            ollama:    { base_url: 'http://localhost:11434',     api_key: 'none',      hint: 'Auto-appends /v1 · needs OLLAMA_ORIGINS=*' },
+            lmstudio:  { base_url: 'http://localhost:1234/v1',   api_key: 'lm-studio', hint: 'OpenAI-compatible · enable CORS in LM Studio settings' },
+            custom:    { base_url: '',                           api_key: '',          hint: 'OpenAI-compatible URL · server must allow this origin' },
+        };
+        const URL_HINTS = {
+            ollama:   'e.g. http://localhost:11434',
+            lmstudio: 'e.g. http://localhost:1234/v1',
+            custom:   'Full base URL including /v1 if applicable',
+        };
+
+        let currentSessionId = localStorage.getItem('last_session_id') || crypto.randomUUID();
+
+        const config = {
+            provider:        'ollama',
+            base_url:        'http://localhost:11434',
+            api_key:         'none',
+            model_name:      'gemma3',
+            embedding_model: 'in-browser:Xenova/all-MiniLM-L6-v2',
+        };
+        try {
+            const saved = localStorage.getItem('app_config_static');
+            if (saved) Object.assign(config, JSON.parse(saved));
+        } catch (_) {}
+
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function normalizeLlmUrl(provider, base) {
+            const u = (base || '').trim().replace(/\/$/, '');
+            if (!u) return '';
+            if (u.endsWith('/v1')) return u;
+            if (provider === 'ollama' || provider === 'lmstudio') return u + '/v1';
+            return u;
+        }
+
+        /* ── IndexedDB ───────────────────────────────────────────────────
+         * sessions:  { id, name, created_at }
+         * documents: { session_id, filename, blob, size, uploaded_at, chunk_count }
+         *            keyPath = [session_id, filename]
+         * chunks:    { id (auto), session_id, doc_filename, chunk_index, text, embedding[] }
+         *            indexes: by_session, by_session_doc
+         * messages:  { id (auto), session_id, role, content, created_at }
+         * ============================================================ */
+        const DB_NAME = 'protorag', DB_VERSION = 1;
+        let _dbPromise = null;
+        function openDB() {
+            if (_dbPromise) return _dbPromise;
+            _dbPromise = new Promise((resolve, reject) => {
+                const req = indexedDB.open(DB_NAME, DB_VERSION);
+                req.onupgradeneeded = () => {
+                    const db = req.result;
+                    if (!db.objectStoreNames.contains('sessions')) {
+                        db.createObjectStore('sessions', { keyPath: 'id' });
+                    }
+                    if (!db.objectStoreNames.contains('documents')) {
+                        const s = db.createObjectStore('documents', { keyPath: ['session_id', 'filename'] });
+                        s.createIndex('by_session', 'session_id');
+                    }
+                    if (!db.objectStoreNames.contains('chunks')) {
+                        const s = db.createObjectStore('chunks', { keyPath: 'id', autoIncrement: true });
+                        s.createIndex('by_session', 'session_id');
+                        s.createIndex('by_session_doc', ['session_id', 'doc_filename']);
+                    }
+                    if (!db.objectStoreNames.contains('messages')) {
+                        const s = db.createObjectStore('messages', { keyPath: 'id', autoIncrement: true });
+                        s.createIndex('by_session', 'session_id');
+                    }
+                };
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+            return _dbPromise;
+        }
+        const reqAsync = (r) => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+        function cursorEach(req, fn) {
+            return new Promise((res, rej) => {
+                req.onsuccess = () => {
+                    const c = req.result;
+                    if (!c) return res();
+                    fn(c);
+                    c.continue();
+                };
+                req.onerror = () => rej(req.error);
+            });
+        }
+        async function dbPutSession(s) {
+            const db = await openDB();
+            await reqAsync(db.transaction('sessions', 'readwrite').objectStore('sessions').put(s));
+        }
+        async function dbEnsureSession(id) {
+            const db = await openDB();
+            const t = db.transaction('sessions', 'readwrite');
+            const s = t.objectStore('sessions');
+            const existing = await reqAsync(s.get(id));
+            if (!existing) s.put({ id, name: '', created_at: Date.now() });
+        }
+        async function dbListSessions() {
+            const db = await openDB();
+            const out = [];
+            await cursorEach(db.transaction('sessions').objectStore('sessions').openCursor(), c => out.push(c.value));
+            return out;
+        }
+        async function dbDeleteSession(id) {
+            const db = await openDB();
+            const t = db.transaction(['sessions', 'documents', 'chunks', 'messages'], 'readwrite');
+            t.objectStore('sessions').delete(id);
+            for (const store of ['documents', 'chunks', 'messages']) {
+                await cursorEach(
+                    t.objectStore(store).index('by_session').openCursor(IDBKeyRange.only(id)),
+                    c => c.delete(),
+                );
+            }
+            await new Promise((r, j) => { t.oncomplete = r; t.onerror = () => j(t.error); });
+        }
+        async function dbPutDocument(doc) {
+            const db = await openDB();
+            await reqAsync(db.transaction('documents', 'readwrite').objectStore('documents').put(doc));
+        }
+        async function dbListDocuments(sessionId) {
+            const db = await openDB();
+            const out = [];
+            await cursorEach(
+                db.transaction('documents').objectStore('documents').index('by_session').openCursor(IDBKeyRange.only(sessionId)),
+                c => out.push(c.value),
+            );
+            return out;
+        }
+        async function dbGetDocument(sessionId, filename) {
+            const db = await openDB();
+            return reqAsync(db.transaction('documents').objectStore('documents').get([sessionId, filename]));
+        }
+        async function dbDeleteDocument(sessionId, filename) {
+            const db = await openDB();
+            const t = db.transaction(['documents', 'chunks'], 'readwrite');
+            t.objectStore('documents').delete([sessionId, filename]);
+            await cursorEach(
+                t.objectStore('chunks').index('by_session_doc').openCursor(IDBKeyRange.only([sessionId, filename])),
+                c => c.delete(),
+            );
+            await new Promise((r, j) => { t.oncomplete = r; t.onerror = () => j(t.error); });
+        }
+        async function dbAddChunks(chunks) {
+            const db = await openDB();
+            const t = db.transaction('chunks', 'readwrite');
+            const s = t.objectStore('chunks');
+            for (const c of chunks) s.add(c);
+            await new Promise((r, j) => { t.oncomplete = r; t.onerror = () => j(t.error); });
+        }
+        async function dbListChunks(sessionId, fileFilter = null) {
+            const db = await openDB();
+            const out = [];
+            await cursorEach(
+                db.transaction('chunks').objectStore('chunks').index('by_session').openCursor(IDBKeyRange.only(sessionId)),
+                c => out.push(c.value),
+            );
+            if (!fileFilter || fileFilter.length === 0) return out;
+            const allow = new Set(fileFilter);
+            return out.filter(c => allow.has(c.doc_filename));
+        }
+        async function dbCountChunks(sessionId) {
+            const db = await openDB();
+            return reqAsync(
+                db.transaction('chunks').objectStore('chunks').index('by_session').count(IDBKeyRange.only(sessionId)),
+            );
+        }
+        async function dbAppendMessage(sessionId, role, content) {
+            const db = await openDB();
+            await reqAsync(
+                db.transaction('messages', 'readwrite').objectStore('messages')
+                  .add({ session_id: sessionId, role, content, created_at: Date.now() }),
+            );
+        }
+        async function dbGetMessages(sessionId) {
+            const db = await openDB();
+            const out = [];
+            await cursorEach(
+                db.transaction('messages').objectStore('messages').index('by_session').openCursor(IDBKeyRange.only(sessionId)),
+                c => out.push(c.value),
+            );
+            return out.sort((a, b) => a.created_at - b.created_at);
+        }
+
+        /* ── Embedder ──────────────────────────────────────────────────── */
+        let _embedder = null;
+        function modelBanner(text) {
+            let el = document.getElementById('model-banner');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'model-banner';
+                el.className = 'fixed top-3 right-3 z-[60] bg-indian-red text-white px-3 py-1.5 rounded-lg shadow-lg text-[11px] font-bold';
+                document.body.appendChild(el);
+            }
+            el.textContent = text;
+            return el;
+        }
+        async function getEmbedder() {
+            if (_embedder) return _embedder;
+            const banner = modelBanner('Loading embedding model (~22 MB, one-time)…');
+            try {
+                _embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', { quantized: true });
+            } finally {
+                banner.remove();
+            }
+            return _embedder;
+        }
+        async function embedTexts(texts) {
+            const e = await getEmbedder();
+            const out = [];
+            for (const t of texts) {
+                const r = await e(t, { pooling: 'mean', normalize: true });
+                out.push(Array.from(r.data));
+            }
+            return out;
+        }
+        function cosine(a, b) {
+            let s = 0;
+            const n = Math.min(a.length, b.length);
+            for (let i = 0; i < n; i++) s += a[i] * b[i];
+            return s; // both pre-normalized → dot = cosine
+        }
+
+        /* ── Chunker (RecursiveCharacterTextSplitter port) ─────────────── */
+        function recursiveSplit(text, size = 1000, overlap = 200, separators = ['\n\n', '\n', ' ', '']) {
+            if (text.length <= size) return [text];
+            const sep = separators[0] ?? '';
+            let pieces;
+            if (sep === '') {
+                pieces = [];
+                for (let i = 0; i < text.length; i += Math.max(1, size - overlap)) {
+                    pieces.push(text.slice(i, i + size));
+                    if (i + size >= text.length) break;
+                }
+                return pieces;
+            }
+            const parts = text.split(sep);
+            const merged = [];
+            let buf = '';
+            for (const p of parts) {
+                const cand = buf ? buf + sep + p : p;
+                if (cand.length <= size) { buf = cand; continue; }
+                if (buf) merged.push(buf);
+                if (p.length > size) {
+                    merged.push(...recursiveSplit(p, size, overlap, separators.slice(1)));
+                    buf = '';
+                } else {
+                    buf = p;
+                }
+            }
+            if (buf) merged.push(buf);
+            if (overlap === 0) return merged;
+            const out = [merged[0]];
+            for (let i = 1; i < merged.length; i++) {
+                const tail = merged[i - 1].slice(Math.max(0, merged[i - 1].length - overlap));
+                out.push(tail + merged[i]);
+            }
+            return out;
+        }
+
+        /* ── File extractors ───────────────────────────────────────────── */
+        const TEXT_EXTS = new Set([
+            'txt', 'md', 'rst', 'log', 'csv', 'tsv',
+            'json', 'jsonl', 'yaml', 'yml',
+            'xml', 'html', 'htm',
+        ]);
+        async function extractText(file) {
+            const ext = (file.name.split('.').pop() || '').toLowerCase();
+            if (TEXT_EXTS.has(ext)) return await file.text();
+            if (ext === 'pdf') {
+                const pdfjs = await loadPdfjs();
+                const buf = await file.arrayBuffer();
+                const doc = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
+                let out = '';
+                for (let p = 1; p <= doc.numPages; p++) {
+                    const page = await doc.getPage(p);
+                    const tc = await page.getTextContent();
+                    out += tc.items.map(it => it.str).join(' ') + '\n\n';
+                }
+                return out;
+            }
+            if (ext === 'docx') {
+                const m = await loadMammoth();
+                const buf = await file.arrayBuffer();
+                const r = await m.extractRawText({ arrayBuffer: buf });
+                return r.value;
+            }
+            throw new Error(`.${ext} is not supported in browser-only mode`);
+        }
+
+        /* ── LLM streaming (OpenAI-compatible) ─────────────────────────── */
+        async function* streamChat(messages, signal) {
+            const url = normalizeLlmUrl(config.provider, config.base_url) + '/chat/completions';
+            const res = await fetch(url, {
+                method: 'POST',
+                signal,
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(config.api_key && config.api_key !== 'none' ? { Authorization: 'Bearer ' + config.api_key } : {}),
+                },
+                body: JSON.stringify({ model: config.model_name, messages, stream: true }),
+            });
+            if (!res.ok) {
+                let detail = '';
+                try { detail = (await res.json()).error?.message || ''; } catch (_) {}
+                throw new Error(`HTTP ${res.status}${detail ? ': ' + detail : ''}`);
+            }
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buf = '';
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                buf += decoder.decode(value, { stream: true });
+                const lines = buf.split('\n');
+                buf = lines.pop();
+                for (const line of lines) {
+                    const t = line.trim();
+                    if (!t.startsWith('data:')) continue;
+                    const data = t.slice(5).trim();
+                    if (data === '[DONE]') return;
+                    try {
+                        const tok = JSON.parse(data).choices?.[0]?.delta?.content || '';
+                        if (tok) yield tok;
+                    } catch (_) {}
+                }
+            }
+        }
+
+        /* ── Mobile sidebar helpers ─────────────────────────────────────── */
+        function openMobileSidebar() {
+            document.getElementById('sidebar').classList.add('mobile-open');
+        }
+        function closeMobileSidebar() {
+            document.getElementById('sidebar').classList.remove('mobile-open');
+        }
+
+        async function init() {
+            await dbEnsureSession(currentSessionId);
+            await loadSessions();
+            await loadSessionHistory(currentSessionId);
+            updateConfigUI();
+            updateSendStopBtn();
+
+            const msgInput = document.getElementById('message-input');
+            msgInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    document.getElementById('chat-form').requestSubmit();
+                }
+            });
+
+            document.getElementById('session-list').addEventListener('click', () => {
+                if (window.innerWidth < 768) closeMobileSidebar();
+            });
+        }
+        // ESM modules defer by default — DOM is parsed by the time we run
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+
+        function autoResizeTextArea(el) {
+            el.style.height = '48px';
+            el.style.height = el.scrollHeight + 'px';
+        }
+
+        /* ── Streaming state ────────────────────────────────────────────── */
+        let isStreaming = false;
+        let abortController = null;
+
+        function updateSendStopBtn() {
+            const btn = document.getElementById('send-stop-btn');
+            if (!btn) return;
+            if (isStreaming) {
+                btn.title = 'Stop response';
+                btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="18" height="18" rx="2.5"/></svg>`;
+                btn.onclick = (e) => { e.preventDefault(); if (abortController) abortController.abort(); };
+            } else {
+                btn.title = 'Send message';
+                btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`;
+                btn.onclick = (e) => { e.preventDefault(); document.getElementById('chat-form').requestSubmit(); };
+            }
+        }
+
+        /* ── @mention autocomplete ──────────────────────────────────────── */
+        // Tracks docs available in the current session
+        let sessionDocs = [];
+        let atMentionActive = false;
+        let atMentionStart = -1;
+        let atSelectedIdx = 0;
+
+        function setSessionDocs(docs) {
+            sessionDocs = docs || [];
+        }
+
+        function handleAtMention(textarea) {
+            const val = textarea.value;
+            const pos = textarea.selectionStart;
+
+            // Find the @ that's closest to and before the cursor
+            let searchFrom = pos - 1;
+            let atPos = -1;
+            while (searchFrom >= 0) {
+                if (val[searchFrom] === '@') { atPos = searchFrom; break; }
+                if (val[searchFrom] === ' ' || val[searchFrom] === '\n') break;
+                searchFrom--;
+            }
+
+            if (atPos === -1) { hideAtPopup(); return; }
+
+            const typed = val.slice(atPos + 1, pos).toLowerCase();
+            const matches = sessionDocs.filter(d => d.toLowerCase().includes(typed));
+
+            if (matches.length === 0) { hideAtPopup(); return; }
+
+            atMentionActive = true;
+            atMentionStart  = atPos;
+            atSelectedIdx   = 0;
+            renderAtPopup(matches);
+        }
+
+        function renderAtPopup(matches) {
+            const popup = document.getElementById('at-mention-popup');
+            popup.innerHTML = matches.map((d, i) => {
+                const ext = d.split('.').pop().toUpperCase();
+                const extColors = { PDF: 'text-red-500', DOCX: 'text-blue-500', TXT: 'text-slate-500', CSV: 'text-emerald-600' };
+                const col = extColors[ext] || 'text-indian-red';
+                const esc = escapeHtml(d);
+                return `<div class="at-mention-item ${i === 0 ? 'selected' : ''}" data-idx="${i}" data-filename="${esc}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="${col} flex-shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                    <span class="truncate flex-1">${esc}</span>
+                    <span class="at-badge">${escapeHtml(ext)}</span>
+                </div>`;
+            }).join('');
+            popup.querySelectorAll('.at-mention-item').forEach(el => {
+                el.addEventListener('mousedown', () => insertAtMention(el.dataset.filename));
+            });
+            popup.classList.remove('hidden');
+        }
+
+        function hideAtPopup() {
+            atMentionActive = false;
+            document.getElementById('at-mention-popup').classList.add('hidden');
+        }
+
+        function handleAtMentionKey(e) {
+            if (!atMentionActive) return;
+            const popup = document.getElementById('at-mention-popup');
+            const items = popup.querySelectorAll('.at-mention-item');
+            if (items.length === 0) return;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                atSelectedIdx = Math.min(atSelectedIdx + 1, items.length - 1);
+                items.forEach((el, i) => el.classList.toggle('selected', i === atSelectedIdx));
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                atSelectedIdx = Math.max(atSelectedIdx - 1, 0);
+                items.forEach((el, i) => el.classList.toggle('selected', i === atSelectedIdx));
+            } else if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                const sel = items[atSelectedIdx];
+                if (sel) insertAtMention(sel.dataset.filename);
+            } else if (e.key === 'Escape') {
+                hideAtPopup();
+            }
+        }
+
+        function insertAtMention(filename) {
+            const textarea = document.getElementById('message-input');
+            const val = textarea.value;
+            const pos = textarea.selectionStart;
+            const before = val.slice(0, atMentionStart);
+            const after  = val.slice(pos);
+            // Filenames with spaces must be quoted so the backend regex @"..." matches them
+            const tag = filename.includes(' ') ? `"${filename}"` : filename;
+            textarea.value = before + '@' + tag + ' ' + after;
+            const newPos = atMentionStart + tag.length + 2;
+            textarea.setSelectionRange(newPos, newPos);
+            textarea.focus();
+            hideAtPopup();
+            autoResizeTextArea(textarea);
+        }
+
+        // Close popup when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#chat-form')) hideAtPopup();
+        });
+
+        function onProviderChange(provider) {
+            const defaults = PROVIDER_DEFAULTS[provider] || PROVIDER_DEFAULTS.custom;
+            const urlInput  = document.getElementById('config-url');
+            const keyInput  = document.getElementById('config-key');
+            const hintEl    = document.getElementById('provider-hint');
+            const urlHintEl = document.getElementById('url-hint');
+            urlInput.value        = defaults.base_url;
+            keyInput.value        = defaults.api_key;
+            urlInput.placeholder  = URL_HINTS[provider] || '';
+            hintEl.textContent    = defaults.hint;
+            urlHintEl.textContent = URL_HINTS[provider] || '';
+        }
+
+        async function loadSessions() {
+            try {
+                const sessions = await dbListSessions();
+                const enriched = await Promise.all(sessions.map(async (s) => {
+                    const [msgs, docs] = await Promise.all([
+                        dbGetMessages(s.id),
+                        dbListDocuments(s.id),
+                    ]);
+                    const lastUser = [...msgs].reverse().find(m => m.role === 'user');
+                    const lastTime = msgs.length ? msgs[msgs.length - 1].created_at : (s.created_at || 0);
+                    return {
+                        id: s.id,
+                        preview: lastUser?.content?.slice(0, 60) || 'Untitled Chat',
+                        is_rag: docs.length > 0,
+                        sort_key: lastTime,
+                    };
+                }));
+                enriched.sort((a, b) => (b.sort_key || 0) - (a.sort_key || 0));
+
+                const list = document.getElementById('session-list');
+                const ragIcon  = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><circle cx="10" cy="13" r="2"></circle><line x1="12" y1="15" x2="14" y2="17"></line></svg>`;
+                const chatIcon = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
+
+                list.innerHTML = enriched.map(s => `
+                    <div class="group relative flex items-center p-2.5 rounded-xl text-gray-600 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-800 cursor-pointer ${s.id === currentSessionId ? 'bg-gray-200/50 dark:bg-slate-800/50' : ''}" data-sid="${escapeHtml(s.id)}">
+                        <div class="flex-shrink-0 ${s.id === currentSessionId ? 'text-indian-red' : ''}">
+                            ${s.is_rag ? ragIcon : chatIcon}
+                        </div>
+                        <span class="nav-text ml-4 text-sm truncate flex-1 pr-6">${escapeHtml(s.preview)}</span>
+                        <button data-del="${escapeHtml(s.id)}" class="absolute right-2 opacity-0 group-hover:opacity-100 p-1.5 hover:text-red-500 transition-all rounded-lg hover:bg-white dark:hover:bg-slate-700">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        </button>
+                    </div>
+                `).join('');
+                list.querySelectorAll('[data-sid]').forEach(el => {
+                    el.addEventListener('click', () => switchSession(el.dataset.sid));
+                });
+                list.querySelectorAll('[data-del]').forEach(el => {
+                    el.addEventListener('click', (e) => { e.stopPropagation(); deleteSession(el.dataset.del); });
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        /* ── Document bar (sidebar section) ─────────────────────────────── */
+        function updateDocBar(docs) {
+            setSessionDocs(docs);   // keep @mention autocomplete in sync
+            const section = document.getElementById('sidebar-docs');
+            const pills   = document.getElementById('doc-pills');
+            if (!docs || docs.length === 0) { section.classList.add('hidden'); return; }
+            section.classList.remove('hidden');
+
+            const getFileIcon = (filename) => {
+                const ext = (filename.split('.').pop() || '').toLowerCase();
+                const colors = { pdf: 'text-red-500', xlsx: 'text-emerald-600', csv: 'text-emerald-600', xls: 'text-emerald-600', doc: 'text-blue-600', docx: 'text-blue-600', txt: 'text-slate-500' };
+                return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${colors[ext] || 'text-indian-red'} flex-shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>`;
+            };
+
+            pills.innerHTML = docs.map(d => {
+                const esc = escapeHtml(d);
+                return `<div class="doc-pill flex items-center justify-between gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-2 rounded-xl text-[11px] font-semibold text-slate-600 dark:text-slate-300 shadow-sm group hover:border-indian-red/30 transition-colors animate-fade-in w-full box-border">
+                    <div class="flex items-center gap-2 overflow-hidden flex-1 cursor-pointer doc-open" data-filename="${esc}" title="${esc}">
+                        ${getFileIcon(d)}
+                        <span class="doc-filename truncate hover:text-indian-red transition-colors">${esc}</span>
+                    </div>
+                    <button class="doc-del flex-shrink-0 p-1 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all flex items-center justify-center" data-filename="${esc}" title="Remove ${esc}">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    </button>
+                </div>`;
+            }).join('');
+            pills.querySelectorAll('.doc-open').forEach(el => {
+                el.addEventListener('click', () => openDocModal(el.dataset.filename));
+            });
+            pills.querySelectorAll('.doc-del').forEach(el => {
+                el.addEventListener('click', (e) => deleteDocument(el.dataset.filename, e));
+            });
+        }
+
+        /* ── Document inspection modal ──────────────────────────────────── */
+        async function openDocModal(filename) {
+            if (!currentSessionId) return;
+            const existing = document.getElementById('doc-modal-overlay');
+            if (existing) existing.remove();
+
+            const doc = await dbGetDocument(currentSessionId, filename);
+            const blob = doc?.blob;
+            const blobUrl = blob ? URL.createObjectURL(blob) : '';
+            const ext = (filename.split('.').pop() || '').toLowerCase();
+
+            const overlay = document.createElement('div');
+            overlay.id = 'doc-modal-overlay';
+            overlay.className = 'fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 md:p-10 animate-fade-in';
+            overlay.onclick = (e) => { if (e.target === overlay) { closeDocModal(); URL.revokeObjectURL(blobUrl); } };
+
+            overlay.innerHTML = `
+                <div class="relative w-full max-w-5xl h-[85vh] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden animate-zoom-in">
+                    <div class="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm sticky top-0 z-10">
+                        <div class="flex items-center gap-3">
+                            <div class="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-indian-red">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100 truncate max-w-[160px] md:max-w-md">${escapeHtml(filename)}</h3>
+                                <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Document Inspection</p>
+                            </div>
+                        </div>
+                        <button onclick="closeDocModal()" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                    <div id="doc-modal-content-area" class="flex-1 overflow-hidden bg-slate-50/50 dark:bg-slate-950/50">
+                        <div class="flex items-center justify-center h-full"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indian-red"></div></div>
+                    </div>
+                    <div class="p-3 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2 bg-white dark:bg-slate-900">
+                        ${blobUrl ? `<a href="${blobUrl}" download="${escapeHtml(filename)}" class="flex items-center gap-2 px-4 py-2 bg-indian-red text-white text-xs font-bold rounded-xl hover:opacity-90 transition-opacity">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            Download
+                        </a>` : ''}
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            const area = document.getElementById('doc-modal-content-area');
+            if (!blob) {
+                area.innerHTML = `<div class="text-slate-500 p-6 text-center">Original file not stored in this browser.</div>`;
+                return;
+            }
+            if (ext === 'pdf') {
+                area.innerHTML = `<iframe src="${blobUrl}" class="w-full h-full rounded-lg border-none"></iframe>`;
+            } else if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(ext)) {
+                area.innerHTML = `<div class="flex items-center justify-center h-full p-4"><img src="${blobUrl}" class="max-w-full max-h-full object-contain shadow-2xl rounded-lg"/></div>`;
+            } else if (TEXT_EXTS.has(ext)) {
+                const text = await blob.text();
+                area.innerHTML = `<pre class="p-6 text-sm font-mono text-slate-700 dark:text-slate-300 whitespace-pre-wrap h-full overflow-auto w-full">${escapeHtml(text)}</pre>`;
+            } else if (ext === 'docx') {
+                try {
+                    const m = await loadMammoth();
+                    const r = await m.convertToHtml({ arrayBuffer: await blob.arrayBuffer() });
+                    area.innerHTML = `<div class="prose dark:prose-invert max-w-none p-6 overflow-auto h-full">${r.value}</div>`;
+                } catch (err) {
+                    area.innerHTML = `<div class="text-red-500 p-6">DOCX render failed: ${escapeHtml(err.message)}</div>`;
+                }
+            } else {
+                area.innerHTML = `<div class="flex flex-col items-center justify-center h-full p-6 text-center gap-3">
+                    <p class="text-sm font-semibold text-slate-700 dark:text-slate-200">No preview for .${escapeHtml(ext)}</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 max-w-md">It is fully indexed for retrieval — use the Download button above to inspect the original.</p>
+                </div>`;
+            }
+        }
+
+        function closeDocModal() {
+            const overlay = document.getElementById('doc-modal-overlay');
+            if (overlay) { overlay.classList.add('animate-fade-out'); setTimeout(() => overlay.remove(), 200); }
+        }
+
+        async function deleteDocument(filename, e) {
+            if (e) e.stopPropagation();
+            if (!confirm(`Remove "${filename}" from this session?\n\nIts vectors will be deleted from the RAG index immediately.`)) return;
+            try {
+                await dbDeleteDocument(currentSessionId, filename);
+                await loadSessionHistory(currentSessionId);
+            } catch (err) { alert(`Failed to delete: ${err.message}`); }
+        }
+
+        async function deleteSession(sid) {
+            if (!confirm('Delete this session and all its documents?')) return;
+            try {
+                await dbDeleteSession(sid);
+                if (sid === currentSessionId) await createNewSession();
+                else await loadSessions();
+            } catch (e) { console.error(e); }
+        }
+
+        async function loadSessionHistory(sid) {
+            currentSessionId = sid;
+            localStorage.setItem('last_session_id', sid);
+            await dbEnsureSession(sid);
+            try {
+                const [msgs, docs] = await Promise.all([dbGetMessages(sid), dbListDocuments(sid)]);
+                const container = document.getElementById('messages');
+                container.innerHTML = '';
+                if (!msgs.length) renderWelcome();
+                else msgs.forEach(m => appendMessage(m.role, m.content));
+                updateDocBar(docs.map(d => d.filename));
+                loadSessions();
+            } catch (e) { console.error(e); }
+        }
+
+        async function createNewSession() {
+            currentSessionId = crypto.randomUUID();
+            localStorage.setItem('last_session_id', currentSessionId);
+            await dbEnsureSession(currentSessionId);
+            document.getElementById('messages').innerHTML = '';
+            renderWelcome();
+            updateDocBar([]);
+            await loadSessions();
+        }
+
+        async function switchSession(sid) { await loadSessionHistory(sid); }
+
+        async function uploadFiles(files) {
+            for (const file of Array.from(files)) {
+                await uploadFile(file);
+            }
+        }
+
+        async function uploadFile(file) {
+            if (!file) return;
+            document.getElementById('file-input').value = '';
+
+            const status = appendMessage('assistant', `Indexing **${escapeHtml(file.name)}**…`);
+            try {
+                const text = await extractText(file);
+                if (!text || !text.trim()) throw new Error('No extractable text in file.');
+                status.innerHTML = DOMPurify.sanitize(marked.parse(`Chunking **${escapeHtml(file.name)}** (${text.length.toLocaleString()} chars)…`));
+
+                const pieces = recursiveSplit(text, 1000, 200);
+                status.innerHTML = DOMPurify.sanitize(marked.parse(`Embedding ${pieces.length} chunks of **${escapeHtml(file.name)}**…`));
+
+                const embeddings = await embedTexts(pieces);
+                const rows = pieces.map((t, i) => ({
+                    session_id:   currentSessionId,
+                    doc_filename: file.name,
+                    chunk_index:  i,
+                    text:         t,
+                    embedding:    embeddings[i],
+                }));
+                await dbAddChunks(rows);
+                await dbPutDocument({
+                    session_id:  currentSessionId,
+                    filename:    file.name,
+                    blob:        file,
+                    size:        file.size,
+                    uploaded_at: Date.now(),
+                    chunk_count: pieces.length,
+                });
+                status.innerHTML = DOMPurify.sanitize(marked.parse(
+                    `Indexed **${escapeHtml(file.name)}** — ${pieces.length} chunks added to the session vector store.`,
+                ));
+                await loadSessionHistory(currentSessionId);
+            } catch (err) {
+                status.innerHTML = `<span class="text-red-500">Upload failed: ${escapeHtml(err.message)}</span>`;
+            }
+        }
+
+        document.getElementById('chat-form').onsubmit = async (e) => {
+            e.preventDefault();
+            if (isStreaming) return;
+
+            const input = document.getElementById('message-input');
+            const msg   = input.value.trim();
+            if (!msg) return;
+
+            input.value = '';
+            input.style.height = '48px';
+            document.getElementById('welcome-msg')?.remove();
+            appendMessage('user', msg);
+
+            const assistantMsgDiv = appendMessage('assistant', `
+                <div class="flex items-center gap-3">
+                    <svg width="24" height="24" viewBox="0 0 100 100" class="animate-gear flex-shrink-0">
+                        <path d="M50 15C58 15 65 22 65 30C73 30 80 37 80 45C80 53 73 60 65 60C65 68 58 75 50 75C42 75 35 68 35 60C27 60 20 53 20 45C20 37 27 30 35 30C35 22 42 15 50 15Z" fill="#CD5C5C"/>
+                        <circle cx="50" cy="45" r="8" fill="#CD5C5C" stroke="white" stroke-width="2"/>
+                    </svg>
+                    <span class="text-[11px] font-medium text-gray-400 dark:text-slate-500 uppercase tracking-widest loading-dots">Thinking</span>
+                </div>
+            `);
+
+            isStreaming = true;
+            abortController = new AbortController();
+            updateSendStopBtn();
+
+            let fullText = "";
+            try {
+                await dbAppendMessage(currentSessionId, 'user', msg);
+
+                // ── @filename mention extraction (@foo or @"foo bar.pdf") ──
+                const mentionRe = /@(?:"([^"]+)"|([^\s@]+))/g;
+                const mentioned = [];
+                for (const m of msg.matchAll(mentionRe)) mentioned.push(m[1] || m[2]);
+                const sessionFiles = (await dbListDocuments(currentSessionId)).map(d => d.filename);
+                const validMentions = mentioned.filter(f => sessionFiles.includes(f));
+                const missingMentions = mentioned.filter(f => !sessionFiles.includes(f));
+
+                // ── Retrieval ────────────────────────────────────────────
+                const totalChunks = await dbCountChunks(currentSessionId);
+                let retrieved = [];
+                let context = '';
+                if (totalChunks > 0) {
+                    const k = Math.min(8, totalChunks);
+                    retrieved = await retrieve(currentSessionId, msg, k, validMentions.length ? validMentions : null);
+                    if (retrieved.length) {
+                        const grouped = {};
+                        for (const c of retrieved) (grouped[c.doc_filename] ||= []).push(c.text);
+                        context = Object.entries(grouped)
+                            .map(([src, parts]) => `### Source: ${src}\n${parts.join('\n\n')}`)
+                            .join('\n\n---\n\n');
+                    }
+                }
+
+                // ── Build OpenAI-format messages (last 10 turns + system) ─
+                const docList = sessionFiles.length
+                    ? `The user has uploaded ${sessionFiles.length} document(s) to this session: ${sessionFiles.map(d => `"${d}"`).join(', ')}.`
+                    : 'No documents have been uploaded to this session yet.';
+                const sysPrompt = `You are a helpful and intelligent AI assistant. ${docList} When answering from document context, always specify which document your answer comes from.`;
+                const history = await dbGetMessages(currentSessionId);
+                const recent = history.slice(-11, -1);   // exclude the user msg we just added
+                const llmMessages = [{ role: 'system', content: sysPrompt }];
+                for (const m of recent) {
+                    if (m.role === 'user' || m.role === 'assistant') {
+                        llmMessages.push({ role: m.role, content: m.content });
+                    }
+                }
+                if (context) {
+                    const note = validMentions.length ? ` (filtered to: ${validMentions.join(', ')})` : '';
+                    llmMessages.push({
+                        role: 'user',
+                        content:
+                            `Retrieved context${note}:\n---------------------\n${context}\n---------------------\n` +
+                            `Answer using the context above and cite which document(s) your answer comes from. ` +
+                            `For questions about how many documents are in the session or their names, ` +
+                            `use the full session document list stated above — not just what was retrieved.\n\nUser Query: ${msg}`,
+                    });
+                } else {
+                    llmMessages.push({ role: 'user', content: msg });
+                }
+
+                // ── Stream from local LLM ────────────────────────────────
+                for await (const tok of streamChat(llmMessages, abortController.signal)) {
+                    if (fullText === '') assistantMsgDiv.innerHTML = '';
+                    fullText += tok;
+                    assistantMsgDiv.innerHTML = DOMPurify.sanitize(marked.parse(fullText));
+                }
+
+                // ── Footnotes for missing @mentions ──────────────────────
+                if (missingMentions.length) {
+                    const warn = `\n\n> ⚠️ **Document(s) not found in this session**: ${missingMentions.map(f => '`' + f + '`').join(', ')}`;
+                    fullText += warn;
+                    assistantMsgDiv.innerHTML = DOMPurify.sanitize(marked.parse(fullText));
+                }
+                if (retrieved.length) {
+                    const sources = [...new Set(retrieved.map(c => c.doc_filename))];
+                    const tail = `\n\n---\n*Retrieved ${retrieved.length} chunks from ${sources.map(s => '`' + s + '`').join(', ')}.*`;
+                    fullText += tail;
+                    assistantMsgDiv.innerHTML = DOMPurify.sanitize(marked.parse(fullText));
+                }
+
+                await dbAppendMessage(currentSessionId, 'assistant', fullText);
+                loadSessions();
+            } catch (err) {
+                if (err.name === 'AbortError') {
+                    assistantMsgDiv.innerHTML = fullText
+                        ? DOMPurify.sanitize(marked.parse(fullText)) + '<p class="text-[11px] text-gray-400 dark:text-slate-500 mt-2 select-none">■ stopped</p>'
+                        : '<em class="text-gray-400 dark:text-slate-500">Response stopped.</em>';
+                    if (fullText) await dbAppendMessage(currentSessionId, 'assistant', fullText);
+                } else {
+                    assistantMsgDiv.innerHTML = `<span class="text-red-500">Error: ${escapeHtml(err.message)}</span>`;
+                }
+            } finally {
+                isStreaming = false;
+                abortController = null;
+                updateSendStopBtn();
+            }
+        };
+
+        function appendMessage(role, content) {
+            const container = document.getElementById('messages');
+            const div   = document.createElement('div');
+            div.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`;
+            const inner = document.createElement('div');
+            inner.className = `max-w-[90%] md:max-w-[85%] p-4 rounded-2xl ${role === 'user' ? 'bg-indian-red text-white rounded-tr-none shadow-md' : 'bg-gray-100 dark:bg-slate-800 dark:text-slate-100 rounded-tl-none border border-gray-200 dark:border-slate-700 shadow-sm'} prose dark:prose-invert prose-sm`;
+            inner.innerHTML = content.includes('animate-gear') ? content : DOMPurify.sanitize(marked.parse(content));
+            div.appendChild(inner);
+            container.appendChild(div);
+            document.getElementById('chat-container').scrollTo({ top: 999999, behavior: 'smooth' });
+            return inner;
+        }
+
+        function renderWelcome() {
+            document.getElementById('messages').innerHTML = `
+                <div id="welcome-msg" class="flex flex-col items-center justify-center min-h-[65vh] text-center animate-fade-in select-none">
+                    <div class="inline-flex items-center justify-center w-20 h-20 md:w-24 md:h-24 bg-indian-red/10 rounded-[2.5rem] mb-6 shadow-sm">
+                        <svg width="50" height="50" viewBox="0 0 100 100"><path d="M50 15C58 15 65 22 65 30C73 30 80 37 80 45C80 53 73 60 65 60C65 68 58 75 50 75C42 75 35 68 35 60C27 60 20 53 20 45C20 37 27 30 35 30C35 22 42 15 50 15Z" fill="#CD5C5C"/><circle cx="50" cy="45" r="8" fill="#CD5C5C" stroke="white" stroke-width="2"/></svg>
+                    </div>
+                    <h1 class="text-3xl md:text-4xl font-black text-gray-800 dark:text-white mb-2 tracking-tight">protoRAG⁺</h1>
+                    <p class="text-gray-500 dark:text-slate-400 text-base md:text-lg">Intelligent RAG with local isolation.</p>
+                </div>`;
+        }
+
+        function toggleSidebar() {
+            const s = document.getElementById('sidebar');
+            if (window.innerWidth < 768) {
+                // On mobile, use slide-in overlay behaviour
+                s.classList.toggle('mobile-open');
+            } else {
+                s.classList.toggle('sidebar-expanded');
+                s.classList.toggle('sidebar-collapsed');
+            }
+        }
+
+        function toggleSettingsModal() {
+            document.getElementById('settings-modal').classList.toggle('hidden');
+        }
+
+        async function testLlmConnection() {
+            const dot    = document.getElementById('config-llm-dot');
+            const status = document.getElementById('config-llm-status');
+            const provider = document.getElementById('config-provider').value;
+            const raw      = document.getElementById('config-url').value.trim();
+            const base     = normalizeLlmUrl(provider, raw);
+            const target   = base + '/models';
+
+            dot.className = 'inline-block w-2 h-2 rounded-full bg-yellow-400 animate-pulse';
+            status.textContent = 'Checking ' + target + '…';
+            status.className = 'text-[10px] text-gray-400 mt-1 ml-1';
+
+            try {
+                const ctrl  = new AbortController();
+                const timer = setTimeout(() => ctrl.abort(), 5000);
+                const headers = (raw && config.api_key && config.api_key !== 'none')
+                    ? { Authorization: 'Bearer ' + document.getElementById('config-key').value.trim() }
+                    : {};
+                const res = await fetch(target, { signal: ctrl.signal, headers });
+                clearTimeout(timer);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json().catch(() => ({}));
+                const count = (data.data || data.models || []).length;
+                dot.className = 'inline-block w-2 h-2 rounded-full bg-green-500';
+                status.textContent = `Connected — ${count} model${count === 1 ? '' : 's'} available`;
+                status.className = 'text-[10px] text-green-600 dark:text-green-400 mt-1 ml-1';
+            } catch (err) {
+                dot.className = 'inline-block w-2 h-2 rounded-full bg-red-500';
+                const msg = err.name === 'AbortError' ? 'timeout (5s)' : (err.message || 'unreachable');
+                status.textContent = `Cannot reach LLM at ${target} — ${msg}. Check OLLAMA_ORIGINS / CORS.`;
+                status.className = 'text-[10px] text-red-600 dark:text-red-400 mt-1 ml-1';
+            }
+        }
+
+        function toggleDocsModal() {
+            document.getElementById('docs-modal').classList.toggle('hidden');
+        }
+
+        function updateConfigUI() {
+            document.getElementById('config-provider').value = config.provider;
+            document.getElementById('config-url').value      = config.base_url;
+            document.getElementById('config-key').value      = config.api_key;
+            document.getElementById('config-model').value    = config.model_name;
+            document.getElementById('config-embed').value    = config.embedding_model;
+            onProviderChange(config.provider);
+            // Re-set after onProviderChange resets them to defaults
+            document.getElementById('config-url').value = config.base_url;
+            document.getElementById('config-key').value = config.api_key;
+        }
+
+        function saveSettings() {
+            config.provider        = document.getElementById('config-provider').value;
+            config.base_url        = document.getElementById('config-url').value.trim();
+            config.api_key         = document.getElementById('config-key').value.trim();
+            config.model_name      = document.getElementById('config-model').value.trim();
+            config.embedding_model = document.getElementById('config-embed').value.trim();
+            localStorage.setItem('app_config_static', JSON.stringify(config));
+            toggleSettingsModal();
+        }
+
+        function toggleDarkMode() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        }
+
+        if (localStorage.getItem('theme') === 'dark' ||
+            (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        }
+
+        /* ── Expose handlers used from inline HTML attributes ──────────── */
+        Object.assign(window, {
+            openMobileSidebar, closeMobileSidebar, toggleSidebar, toggleDarkMode,
+            toggleSettingsModal, toggleDocsModal,
+            createNewSession, deleteSession, switchSession,
+            uploadFiles, openDocModal, closeDocModal, deleteDocument,
+            autoResizeTextArea, handleAtMention, handleAtMentionKey,
+            onProviderChange, saveSettings, testLlmConnection,
+        });
+    </script>
+</body>
+</html>
