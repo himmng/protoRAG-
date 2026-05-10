@@ -44,6 +44,38 @@ async def _private_network_access(request, call_next):
         return resp
     return await call_next(request)
 
+
+# Optional shared-secret auth for Mode A (public cloud deployments). When
+# PROTORAG_API_TOKEN is set, every /api/* request must include a matching
+# X-API-Token header. /api/health stays open so the frontend's connection
+# check works without configuration. When the env var is unset (Mode B local
+# usage), this middleware is a no-op.
+_API_TOKEN = os.environ.get("PROTORAG_API_TOKEN", "").strip()
+_AUTH_EXEMPT_PATHS = {"/api/health", "/"}
+
+
+@app.middleware("http")
+async def _require_api_token(request, call_next):
+    if not _API_TOKEN:
+        return await call_next(request)
+    path = request.url.path
+    if request.method == "OPTIONS" or path in _AUTH_EXEMPT_PATHS or not path.startswith("/api/"):
+        return await call_next(request)
+    # GETs from <img>, <iframe>, and download anchors can't set custom headers;
+    # accept ?token= as a fallback for those. The token is stored in localStorage
+    # client-side anyway, so this doesn't expand the trust surface meaningfully.
+    supplied = request.headers.get("x-api-token") or (
+        request.query_params.get("token") if request.method == "GET" else None
+    )
+    if supplied != _API_TOKEN:
+        from starlette.responses import JSONResponse
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Missing or invalid X-API-Token header"},
+            headers={"Access-Control-Allow-Origin": request.headers.get("origin", "*")},
+        )
+    return await call_next(request)
+
 DATA_DIR = os.environ.get("DEFAULT_DATA_DIR", "./data")
 MAX_HISTORY_ENTRIES = 200
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024

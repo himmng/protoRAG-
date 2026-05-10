@@ -383,6 +383,9 @@
                         </button>
                     </div>
                     <div id="config-backend-status" class="text-[10px] text-gray-400 mt-1">Your tailscale, cloudflared tunnel for remote backend, or <code class="bg-gray-200 dark:bg-slate-700 px-1 rounded">http://localhost:8000</code> when running the backend locally.</div>
+                    <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 mt-4">Backend Token (only if backend has <code class="bg-gray-200 dark:bg-slate-700 px-1 rounded normal-case">PROTORAG_API_TOKEN</code> set)</label>
+                    <input id="config-api-token" type="password" placeholder="leave blank for unsecured / local backends" class="w-full bg-white dark:bg-slate-800 p-3 rounded-xl outline-none border border-gray-200 dark:border-slate-700 focus:border-indian-red transition-all font-mono text-xs">
+                    <div class="text-[10px] text-gray-400 mt-1">Sent as <code class="bg-gray-200 dark:bg-slate-700 px-1 rounded">X-API-Token</code> header. Different from your LLM provider key below.</div>
                 </div>
 
                 <!-- Data Storage Path -->
@@ -522,6 +525,46 @@
                     </p>
                 </div>
 
+                <!-- Cloud deployment + tunneled Ollama -->
+                <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                    <h3 class="text-[11px] font-bold text-indian-red uppercase tracking-wider mb-2">Cloud deployment — shared backend, your local Ollama via tunnel</h3>
+                    <p class="mb-3">
+                        For a publicly hosted backend that everyone shares, expose your local Ollama through a tunnel so
+                        the cloud backend can reach it. <b>Documents and embeddings live on the cloud backend, not your machine</b> —
+                        if you want fully local storage, use the Quick Start above instead.
+                    </p>
+                    <ol class="list-decimal pl-5 space-y-2 text-[13px]">
+                        <li>
+                            Deploy the backend to Render / Railway / Fly using the repo's
+                            <code class="bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-[11px]">Dockerfile</code>
+                            (the repo includes <code class="bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-[11px]">render.yaml</code>
+                            for a one-click Render deploy). Set the env var
+                            <code class="bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-[11px]">PROTORAG_API_TOKEN</code> to a long random string —
+                            without it the public backend is open to anyone.
+                        </li>
+                        <li>
+                            Tunnel your local Ollama to a public URL. Pick one:
+                            <ul class="list-disc pl-5 mt-1 space-y-1">
+                                <li><code class="bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-[11px]">cloudflared tunnel --url http://localhost:11434</code> → use the printed <code class="bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-[11px]">https://*.trycloudflare.com</code></li>
+                                <li><code class="bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-[11px]">tailscale serve 11434</code> → use the Tailscale magic-DNS URL</li>
+                                <li><code class="bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-[11px]">ngrok http 11434</code> → use the printed <code class="bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-[11px]">https://*.ngrok.app</code></li>
+                            </ul>
+                        </li>
+                        <li>In <b>Settings</b> on this page set:
+                            <ul class="list-disc pl-5 mt-1 space-y-1">
+                                <li><b>Remote URL</b> → your deployed backend (e.g. <code class="bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-[11px]">https://protorag.onrender.com</code>)</li>
+                                <li><b>Backend Token</b> → the same string you set as <code class="bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-[11px]">PROTORAG_API_TOKEN</code></li>
+                                <li><b>Base URL</b> → your tunnel URL from step 2</li>
+                            </ul>
+                        </li>
+                        <li>Click <b>Test</b>. Green dot = backend reachable. Then upload a document and chat — the cloud backend will fetch from your tunneled Ollama on every request.</li>
+                    </ol>
+                    <p class="text-[11px] text-gray-500 dark:text-slate-400 mt-3">
+                        ⚠️ The token gates the backend, not the LLM tunnel. If you don't want strangers using your Ollama, also set
+                        <code class="bg-gray-200 dark:bg-slate-700 px-1 rounded">OLLAMA_HOST=127.0.0.1</code> and rely on the tunnel ACL.
+                    </p>
+                </div>
+
                 <!-- 1. Session modes -->
                 <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
                     <h3 class="text-[11px] font-bold text-indian-red uppercase tracking-wider mb-3">1 · Session lifecycle</h3>
@@ -638,6 +681,7 @@
 
         const config = {
             backend_url:     '',
+            api_token:       '',
             data_dir:        '',
             provider:        'ollama',
             base_url:        'http://localhost:11434',
@@ -668,6 +712,21 @@
             if (!config.data_dir) return url;
             const sep = url.includes('?') ? '&' : '?';
             return url + sep + 'data_dir=' + encodeURIComponent(config.data_dir);
+        }
+
+        // Header sent on every backend call when a token is configured.
+        // The backend ignores this when PROTORAG_API_TOKEN is unset (Mode B).
+        function authHeaders() {
+            return config.api_token ? { 'X-API-Token': config.api_token } : {};
+        }
+
+        // For URLs used in <img src>, <iframe src>, and download anchors —
+        // browsers can't set custom headers on those, so we append ?token=
+        // which the backend accepts as a fallback for GETs.
+        function tokenizeUrl(url) {
+            if (!config.api_token) return url;
+            const sep = url.includes('?') ? '&' : '?';
+            return url + sep + 'token=' + encodeURIComponent(config.api_token);
         }
 
         /* ── Mobile sidebar helpers ─────────────────────────────────────── */
@@ -841,7 +900,7 @@
 
         async function loadSessions() {
             try {
-                const res  = await fetch(apiWithDataDir('/api/sessions'));
+                const res  = await fetch(apiWithDataDir('/api/sessions'), { headers: authHeaders() });
                 const data = await res.json();
                 const list = document.getElementById('session-list');
 
@@ -913,8 +972,11 @@
             overlay.className = 'fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 md:p-10 animate-fade-in';
             overlay.onclick = (e) => { if (e.target === overlay) closeDocModal(); };
 
-            const fileUrl    = apiWithDataDir(`/api/sessions/${currentSessionId}/documents/${encodeURIComponent(filename)}`);
-            const previewUrl = apiWithDataDir(`/api/sessions/${currentSessionId}/documents/${encodeURIComponent(filename)}/preview`);
+            // Tokenize so <img src>, <iframe src>, and the download anchor work
+            // when the backend has PROTORAG_API_TOKEN set (those elements can't
+            // carry the X-API-Token header). No-op when no token is configured.
+            const fileUrl    = tokenizeUrl(apiWithDataDir(`/api/sessions/${currentSessionId}/documents/${encodeURIComponent(filename)}`));
+            const previewUrl = tokenizeUrl(apiWithDataDir(`/api/sessions/${currentSessionId}/documents/${encodeURIComponent(filename)}/preview`));
             const ext = (filename.split('.').pop() || '').toLowerCase();
             const officeExts = ['docx', 'doc', 'pptx', 'ppt', 'xlsx', 'xls'];
 
@@ -960,7 +1022,7 @@
                     <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indian-red"></div>
                     <p class="text-xs uppercase tracking-widest font-bold">Rendering preview…</p>
                 </div>`;
-                fetch(previewUrl).then(async (r) => {
+                fetch(previewUrl, { headers: authHeaders() }).then(async (r) => {
                     if (!r.ok) {
                         const err = await r.json().catch(() => ({ detail: r.statusText }));
                         area.innerHTML = `<div class="flex flex-col items-center justify-center h-full p-6 text-center gap-3">
@@ -978,7 +1040,7 @@
                     area.innerHTML = `<div class="text-red-500 p-6">Failed to load preview: ${escapeHtml(err.message)}</div>`;
                 });
             } else {
-                fetch(fileUrl).then(r => r.text()).then(text => {
+                fetch(fileUrl, { headers: authHeaders() }).then(r => r.text()).then(text => {
                     area.innerHTML = `<pre class="p-6 text-sm font-mono text-slate-700 dark:text-slate-300 whitespace-pre-wrap h-full overflow-auto w-full">${text.replace(/</g, '&lt;')}</pre>`;
                 }).catch(() => {
                     area.innerHTML = `<div class="text-red-500 p-6">Failed to load.</div>`;
@@ -997,7 +1059,7 @@
             try {
                 const res = await fetch(
                     apiWithDataDir(`/api/sessions/${currentSessionId}/documents/${encodeURIComponent(filename)}`),
-                    { method: 'DELETE' }
+                    { method: 'DELETE', headers: authHeaders() }
                 );
                 if (res.ok) {
                     await loadSessionHistory(currentSessionId);
@@ -1011,7 +1073,7 @@
         async function deleteSession(sid) {
             if (!confirm('Delete this session and all its documents?')) return;
             try {
-                await fetch(apiWithDataDir(`/api/sessions/${sid}`), { method: 'DELETE' });
+                await fetch(apiWithDataDir(`/api/sessions/${sid}`), { method: 'DELETE', headers: authHeaders() });
                 if (sid === currentSessionId) createNewSession();
                 else loadSessions();
             } catch (e) { console.error(e); }
@@ -1021,7 +1083,7 @@
             currentSessionId = sid;
             localStorage.setItem('last_session_id', sid);
             try {
-                const res  = await fetch(apiWithDataDir(`/api/sessions/${sid}`));
+                const res  = await fetch(apiWithDataDir(`/api/sessions/${sid}`), { headers: authHeaders() });
                 const data = await res.json();
                 const container = document.getElementById('messages');
                 container.innerHTML = '';
@@ -1067,7 +1129,7 @@
 
             appendMessage('assistant', `Indexing **${file.name}**…`);
             try {
-                const res    = await fetch(api('/api/upload'), { method: 'POST', body: formData });
+                const res    = await fetch(api('/api/upload'), { method: 'POST', body: formData, headers: authHeaders() });
                 const result = await res.json();
                 appendMessage('assistant', result.message);
                 await loadSessionHistory(currentSessionId);
@@ -1105,7 +1167,7 @@
             try {
                 const response = await fetch(api('/api/chat'), {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', ...authHeaders() },
                     signal: abortController.signal,
                     body: JSON.stringify({
                         session_id: currentSessionId,
@@ -1232,6 +1294,7 @@
 
         function updateConfigUI() {
             document.getElementById('config-backend').value  = config.backend_url || '';
+            document.getElementById('config-api-token').value = config.api_token || '';
             document.getElementById('config-data-dir').value = config.data_dir || '';
             document.getElementById('config-provider').value = config.provider;
             document.getElementById('config-url').value      = config.base_url;
@@ -1247,6 +1310,7 @@
         function saveSettings() {
             const prevDataDir = config.data_dir;
             config.backend_url     = document.getElementById('config-backend').value.trim();
+            config.api_token       = document.getElementById('config-api-token').value.trim();
             config.data_dir        = document.getElementById('config-data-dir').value.trim();
             config.provider        = document.getElementById('config-provider').value;
             config.base_url        = document.getElementById('config-url').value.trim();
