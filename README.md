@@ -60,11 +60,13 @@ For a publicly hosted backend that several users share. **Documents and embeddin
 
 ### 1. Deploy the backend
 
-The repo includes [render.yaml](render.yaml) for a one-click Render deploy:
+The repo includes [render.yaml](render.yaml) for a one-click Render deploy on the **free plan**:
 
 1. Push the repo to GitHub.
-2. On Render: **New → Blueprint** → select the repo. Render reads `render.yaml`, generates a `PROTORAG_API_TOKEN`, and mounts a 5 GB persistent disk at `/app/data`.
+2. On Render: **New → Blueprint** → select the repo. Render reads `render.yaml` and generates a `PROTORAG_API_TOKEN`.
 3. Copy the generated token from the env-vars page. Without it the public backend is open to anyone.
+
+**Free-tier caveats:** Render's free plan has **no persistent disk**, so `/app/data` (sessions, embeddings, uploads) is wiped on every restart/redeploy. The service also **spins down after ~15 min of inactivity** and cold-starts on the next request. Treat it as a demo deployment — for persistence, either upgrade to `plan: starter` and re-add the `disk:` block in [render.yaml](render.yaml) (5 GB at `/app/data`), or use **Mode B**.
 
 The same Dockerfile works on Railway, Fly.io, etc. Just set `PROTORAG_API_TOKEN` to a long random string.
 

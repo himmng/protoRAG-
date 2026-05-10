@@ -2,13 +2,9 @@ services:
   - type: web
     name: protorag-backend
     runtime: docker
-    plan: starter
+    plan: free
     dockerfilePath: ./Dockerfile
     healthCheckPath: /api/health
     envVars:
       - key: PROTORAG_API_TOKEN
         generateValue: true
-    disk:
-      name: protorag-data
-      mountPath: /app/data
-      sizeGB: 5
