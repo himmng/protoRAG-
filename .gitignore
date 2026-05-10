@@ -18,4 +18,5 @@ __pycache__/
 .netlify
 data/
 node_modules/
+protorag_storage/
 
