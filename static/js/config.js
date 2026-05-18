@@ -1,0 +1,55 @@
+// Provider/UI defaults, the persisted config singleton, and currentSessionId.
+
+export const PROVIDER_DEFAULTS = {
+    ollama:    { base_url: 'http://localhost:11434',     api_key: 'none',      hint: 'Auto-appends /v1 · needs OLLAMA_ORIGINS set' },
+    lmstudio:  { base_url: 'http://localhost:1234',      api_key: 'lm-studio', hint: 'Auto-appends /v1 · LM Studio server mode' },
+    openai:    { base_url: 'https://api.openai.com/v1',  api_key: '',          hint: 'Include /v1 in URL · real API key required' },
+    litellm:   { base_url: 'http://localhost:4000',      api_key: 'any',       hint: 'Proxy root · /v1 added by LiteLLM automatically' },
+    anthropic: { base_url: 'http://localhost:11434/v1',  api_key: '',          hint: 'LLM → Anthropic API · Base URL = embedding service (e.g. Ollama /v1)' },
+    custom:    { base_url: '',                            api_key: '',          hint: 'Use the exact endpoint your server expects' },
+};
+
+export const URL_HINTS = {
+    ollama:    'e.g. http://localhost:11434 or your tailscale/cloudflared URL',
+    lmstudio:  'e.g. http://localhost:1234',
+    openai:    'e.g. https://api.openai.com/v1',
+    litellm:   'e.g. http://localhost:4000',
+    anthropic: 'Embedding service URL — e.g. http://localhost:11434/v1 (Ollama)',
+    custom:    'Full base URL including path if needed',
+};
+
+// Mutable singleton — modules read/write fields on this object directly so
+// updates propagate without any per-module wiring.
+export const config = {
+    backend_url:     '',
+    data_dir:        '',
+    provider:        'ollama',
+    base_url:        'http://localhost:11434',
+    api_key:         'none',
+    model_name:      'gemma-4-e4b:latest',
+    embedding_model: 'embeddinggemma:latest',
+};
+
+const savedConfig = localStorage.getItem('app_config');
+if (savedConfig) Object.assign(config, JSON.parse(savedConfig));
+
+// Wrapped so `state.currentSessionId` always reflects the latest assignment.
+// (Exporting a `let` binding works too, but the wrapper keeps every caller on
+// the same path: read `state.currentSessionId`, write `setCurrentSessionId(...)`.)
+export const state = {
+    currentSessionId: localStorage.getItem('last_session_id') || crypto.randomUUID(),
+};
+
+export function setCurrentSessionId(sid) {
+    state.currentSessionId = sid;
+    localStorage.setItem('last_session_id', sid);
+}
+
+export function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}

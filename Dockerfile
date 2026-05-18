@@ -11,7 +11,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY backend.py index.html ./
+COPY backend ./backend
+COPY index.html ./
 
 ENV PYTHONUNBUFFERED=1 \
     DEFAULT_DATA_DIR=/app/data

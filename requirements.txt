@@ -11,3 +11,4 @@ langchain-anthropic>=0.1.15
 chromadb>=0.5.0
 pypdf>=4.2.0
 pydantic>=2.7.0
+google-auth>=2.30.0

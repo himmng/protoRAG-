@@ -2,7 +2,7 @@
 
 protoRAG+ is a lightweight, local-first RAG (Retrieval-Augmented Generation) chat application.
 It lets you upload documents, index them locally with Chroma, and chat with an LLM using those documents as context.
-The UI is served from a static `index.html`, and the backend is a FastAPI app in `backend.py`.
+The UI is served from a static `index.html`, and the backend is a FastAPI app in the `backend/` package.
 
 ---
 
@@ -42,13 +42,13 @@ pip install -r requirements.txt
 2. Start the backend:
 
    ```bash
-   python backend.py
+   python -m backend
    ```
 
 3. Open the UI:
 
    - The backend serves `index.html` from the project root at `http://localhost:8000/`.
-   - Ensure `index.html` is present alongside `backend.py`.
+   - Ensure `index.html` is present alongside the `backend/` package.
 
 4. Configure the UI (in the Settings modal):
 
@@ -149,9 +149,39 @@ The FastAPI backend exposes a few main endpoints:
 ## Data Storage
 
 - Default base directory: `./data` (override with `DEFAULT_DATA_DIR` environment variable).
-- Layout (per session):
-  - `data/db/session/<session_id>/` – Chroma DB and `history.json`
-  - `data/documents/session/<session_id>/` – uploaded documents
+- A small SQLite user store sits at `./data/users.db` (users + auth sessions).
+- RAG data is per user:
+  - `data/users/<user_id>/db/session/<session_id>/` – Chroma DB and `history.json`
+  - `data/users/<user_id>/documents/session/<session_id>/` – uploaded documents
+- First visit issues a `pr_guest` cookie (HttpOnly, 1y TTL) so anonymous use
+  still works without sign-in. Each guest gets their own `<user_id>` folder.
+- Pre-existing flat `data/db/session/...` directories from earlier versions
+  are not auto-migrated. Re-upload to bring them into the new per-user layout.
+
+---
+
+## Authentication (optional)
+
+Google sign-in is opt-in via an env var. With it set, the sidebar shows a
+"Sign in with Google" button; users get their own isolated RAG storage. Their
+existing guest sessions are merged into the Google account on first login.
+
+```bash
+export GOOGLE_CLIENT_ID="123…apps.googleusercontent.com"
+python -m backend
+```
+
+Set up a Google Cloud OAuth 2.0 Client ID (Web application) and add the
+backend's origin to the **Authorized JavaScript origins** list. Without
+`GOOGLE_CLIENT_ID`, sign-in is hidden and all users stay anonymous.
+
+Additional env vars:
+- `PROTORAG_COOKIE_SECURE=1` — required when serving behind HTTPS (Render,
+  Cloudflare, etc.). Disabled on plain `http://localhost` by default.
+- `PROTORAG_CORS_ORIGINS=https://myfrontend.netlify.app,https://...` —
+  comma-separated allowlist for cross-origin frontends. When set, the backend
+  emits `Access-Control-Allow-Credentials: true` so auth cookies traverse the
+  origin boundary. Required for Netlify-style deploys.
 
 ---
 
