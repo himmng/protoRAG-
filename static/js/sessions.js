@@ -50,7 +50,7 @@ export function updateDocBar(docs) {
 
     pills.innerHTML = docs.map(d => {
         const esc = escapeHtml(d);
-        return `<div class="doc-pill flex items-center justify-between gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-2 rounded-xl text-[11px] font-semibold text-slate-600 dark:text-slate-300 shadow-sm group hover:border-indian-red/30 transition-colors animate-fade-in w-full box-border">
+        return `<div class="doc-pill glass-pill flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-[11px] font-semibold text-slate-600 dark:text-slate-300 group hover:border-indian-red/30 transition-colors animate-fade-in w-full box-border">
             <div class="flex items-center gap-2 overflow-hidden flex-1 cursor-pointer doc-open" data-filename="${esc}" title="${esc}">
                 ${getFileIcon(d)}
                 <span class="doc-filename truncate hover:text-indian-red transition-colors">${esc}</span>

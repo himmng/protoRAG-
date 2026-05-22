@@ -196,3 +196,95 @@ uvicorn backend:app --host 0.0.0.0 --port 8000 --reload
 Ensure `index.html` is present in the project root so the UI is served at `/`.
 
 ---
+
+## Deploying the frontend on Netlify (with local backend)
+
+The frontend is a static SPA — Netlify just serves the files. All API calls
+go to a backend URL the user configures in **Settings**. A typical layout:
+
+```
+┌─────────────────────────┐         ┌──────────────────────────┐
+│ Browser                 │         │ Your machine             │
+│ ─────────────────────── │         │ ──────────────────────── │
+│ https://your.netlify.app│ ──API──►│ Cloudflare Tunnel (HTTPS)│
+│ (static SPA, Google GIS)│         │     ↓                    │
+│                         │         │ uvicorn backend.app:app  │
+│                         │         │ Ollama on :11434         │
+└─────────────────────────┘         └──────────────────────────┘
+```
+
+### 1. Backend env (`.env` next to `uvicorn`)
+
+```bash
+GOOGLE_CLIENT_ID=<your-oauth-client-id>
+PROTORAG_CORS_ORIGINS=https://your-site.netlify.app
+PROTORAG_COOKIE_SECURE=1
+```
+
+The backend loads `.env` automatically via `python-dotenv`. Real env vars
+set by your shell or service manager still win — see
+[backend/__init__.py](backend/__init__.py).
+
+### 2. Google Cloud Console → OAuth Client → Authorized JavaScript origins
+
+Add the **frontend** origins (Google checks the page that loads GIS, not
+the API host). For most setups:
+
+- `http://localhost:8000` — local dev
+- `https://your-site.netlify.app` — prod
+
+Do **not** add the Cloudflare/Tailscale tunnel hostname — the browser
+never opens that URL directly, it just `fetch`es from it.
+
+### 3. Expose the local backend over HTTPS
+
+`SameSite=None` cookies require `Secure`, which requires HTTPS. Use a
+**named Cloudflare Tunnel** so the hostname is stable (a quick tunnel
+rotates every restart and breaks the CORS allowlist):
+
+```bash
+brew install cloudflared
+cloudflared tunnel login
+cloudflared tunnel create protorag
+# Edit ~/.cloudflared/config.yml:
+#   tunnel: protorag
+#   credentials-file: ~/.cloudflared/<UUID>.json
+#   ingress:
+#     - hostname: api.yourdomain.com
+#       service: http://localhost:8000
+#     - service: http_status:404
+cloudflared tunnel route dns protorag api.yourdomain.com
+cloudflared tunnel run protorag
+```
+
+Then start the backend bound to localhost:
+
+```bash
+python3.12 -m uvicorn backend.app:app --host 127.0.0.1 --port 8000
+```
+
+**Don't have a domain?** Use Tailscale Funnel instead:
+
+```bash
+tailscale serve --bg --https=443 http://127.0.0.1:8000
+tailscale funnel 443 on
+```
+
+It gives you a stable `*.ts.net` hostname over HTTPS for free.
+
+### 4. Wire the deployed frontend
+
+Open `https://your-site.netlify.app` → **Settings** → set **Remote URL** to
+your tunnel hostname (`https://api.yourdomain.com` or the `*.ts.net` URL)
+→ Save. Stored in `localStorage`. Click **Test** to verify connectivity.
+
+### Common gotchas
+
+| Symptom | Likely cause |
+|---|---|
+| Google button doesn't render in the gate | Backend `.env` is missing `GOOGLE_CLIENT_ID`. |
+| `origin_mismatch` from Google | Netlify URL not in **Authorized JavaScript origins**. |
+| Sign-in "succeeds" but page acts logged out | `Set-Cookie` response missing `Secure; SameSite=None` — `PROTORAG_COOKIE_SECURE=1` not set. |
+| `OPTIONS /api/...` returns CORS error | Netlify URL not in `PROTORAG_CORS_ORIGINS` (must match scheme + host exactly). |
+
+---

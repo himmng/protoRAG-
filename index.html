@@ -28,7 +28,76 @@
         }
     </script>
     <style>
-        :root { --indian-red: #CD5C5C; }
+        :root {
+            --indian-red: #CD5C5C;
+
+            /* Premium solid surfaces — Linear/Vercel-style. Warm-tinted in
+               light mode, deep navy in dark. Layered shadow for depth. */
+            --surface-bg: #ffffff;
+            --surface-bg-tint: #fdfcfa;          /* warm off-white for sub-sections */
+            --surface-border: rgba(15, 23, 42, 0.07);
+            --surface-divider: rgba(15, 23, 42, 0.06);
+            --surface-shadow:
+                0 0 0 1px rgba(15, 23, 42, 0.02),
+                0 24px 48px -16px rgba(15, 23, 42, 0.16),
+                0 8px 16px -8px rgba(15, 23, 42, 0.06);
+            --surface-shadow-sm:
+                0 0 0 1px rgba(15, 23, 42, 0.02),
+                0 1px 2px rgba(15, 23, 42, 0.04);
+        }
+        .dark {
+            --surface-bg: #0f172a;               /* slate-900 */
+            --surface-bg-tint: #1a2438;          /* a hair lighter for sub-sections */
+            --surface-border: rgba(255, 255, 255, 0.07);
+            --surface-divider: rgba(255, 255, 255, 0.06);
+            --surface-shadow:
+                0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+                0 24px 48px -16px rgba(0, 0, 0, 0.7),
+                0 8px 16px -8px rgba(0, 0, 0, 0.4);
+            --surface-shadow-sm:
+                0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+                0 1px 2px rgba(0, 0, 0, 0.35);
+        }
+
+        /* Card-sized surface: modals, sidebar, chat input, doc preview. */
+        .glass-surface {
+            background: var(--surface-bg);
+            border: 1px solid var(--surface-border);
+            box-shadow: var(--surface-shadow);
+        }
+        /* Smaller floating surface: pills, top-right buttons, message bubbles. */
+        .glass-pill {
+            background: var(--surface-bg);
+            border: 1px solid var(--surface-border);
+            box-shadow: var(--surface-shadow-sm);
+        }
+        /* Inset section inside a card — gives visual rhythm without re-stacking. */
+        .surface-inset {
+            background: var(--surface-bg-tint);
+            border: 1px solid var(--surface-divider);
+        }
+        /* Sidebar: flush column, only a right-edge separator + faint shadow. */
+        #sidebar.glass-surface {
+            box-shadow: 1px 0 0 var(--surface-border), 2px 0 16px -8px rgba(15, 23, 42, 0.06);
+        }
+        .dark #sidebar.glass-surface {
+            box-shadow: 1px 0 0 var(--surface-border), 2px 0 16px -8px rgba(0, 0, 0, 0.5);
+        }
+
+        /* App-wide ambient backdrop — subtle warm wash to tie everything to
+           the auth gate's family without competing with the solid surfaces. */
+        body.app-bg {
+            background:
+                radial-gradient(900px 600px at 15% -10%, rgba(205, 92, 92, 0.05), transparent 60%),
+                radial-gradient(700px 500px at 110% 110%, rgba(205, 92, 92, 0.035), transparent 55%),
+                linear-gradient(180deg, #fbf9f6 0%, #ffffff 100%);
+        }
+        .dark body.app-bg {
+            background:
+                radial-gradient(900px 600px at 15% -10%, rgba(205, 92, 92, 0.10), transparent 60%),
+                radial-gradient(700px 500px at 110% 110%, rgba(205, 92, 92, 0.06), transparent 55%),
+                linear-gradient(180deg, #0b1220 0%, #020617 100%);
+        }
 
         html { -webkit-text-size-adjust: 100%; }
 
@@ -172,20 +241,15 @@
             bottom: calc(100% + 8px);
             left: 0;
             right: 0;
-            background: white;
-            border: 1.5px solid #e2e8f0;
+            background: var(--surface-bg);
+            border: 1px solid var(--surface-border);
             border-radius: 16px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.13);
+            box-shadow: var(--surface-shadow);
             overflow: hidden;
             z-index: 100;
             animation: fadeIn 0.15s ease-out;
             max-height: 220px;
             overflow-y: auto;
-        }
-        .dark #at-mention-popup {
-            background: #1e293b;
-            border-color: #334155;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
         }
         .at-mention-item {
             display: flex;
@@ -234,6 +298,9 @@
         }
         @keyframes gateFadeIn { from { opacity: 0; } to { opacity: 1; } }
 
+        /* Hero card keeps its bespoke glass treatment — the gate is the
+           only place where frosted glass earns its keep (huge warm gradient
+           backdrop, single floating card, first impression). */
         #auth-gate .gate-card {
             position: relative;
             background: rgba(255, 255, 255, 0.74);
@@ -344,7 +411,7 @@
         }
     </style>
 </head>
-<body class="bg-white dark:bg-slate-950 text-gray-900 dark:text-slate-100 font-sans h-screen flex overflow-hidden">
+<body class="app-bg text-gray-900 dark:text-slate-100 font-sans h-screen flex overflow-hidden">
 
     <!-- ── Auth gate (shown until the user picks guest or Google) ───────── -->
     <div id="auth-gate" class="hidden fixed inset-0 z-50 flex items-center justify-center p-6">
@@ -398,7 +465,7 @@
     <div id="sidebar-backdrop" onclick="closeMobileSidebar()"></div>
 
     <!-- ── Sidebar ─────────────────────────────────────────────────────── -->
-    <aside id="sidebar" class="sidebar-expanded relative z-30 h-full bg-gray-50 dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 flex flex-col shadow-sm">
+    <aside id="sidebar" class="sidebar-expanded glass-surface relative z-30 h-full flex flex-col">
         <div class="p-4 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between overflow-hidden">
             <div class="flex items-center gap-3 cursor-pointer" onclick="toggleSidebar()">
                 <div class="logo-container flex-shrink-0">
@@ -462,17 +529,17 @@
 
         <!-- Top-right controls -->
         <div class="absolute top-3 right-4 z-40 flex items-center gap-2">
-            <button onclick="toggleDocsModal()" title="Documentation" class="p-2.5 bg-white/80 dark:bg-slate-800/80 backdrop-blur border border-gray-200 dark:border-slate-700 rounded-full shadow-lg hover:scale-110 transition-all text-indian-red">
+            <button onclick="toggleDocsModal()" title="Documentation" class="glass-pill p-2.5 rounded-full hover:scale-110 transition-all text-indian-red">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path><line x1="9" y1="7" x2="16" y2="7"></line><line x1="9" y1="11" x2="16" y2="11"></line></svg>
             </button>
-            <button onclick="toggleDarkMode()" class="p-2.5 bg-white/80 dark:bg-slate-800/80 backdrop-blur border border-gray-200 dark:border-slate-700 rounded-full shadow-lg hover:scale-110 transition-all">
+            <button onclick="toggleDarkMode()" class="glass-pill p-2.5 rounded-full hover:scale-110 transition-all">
                 <svg id="theme-sun" class="block dark:hidden text-orange-500" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
                 <svg id="theme-moon" class="hidden dark:block text-blue-400" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
             </button>
         </div>
 
         <!-- Mobile hamburger -->
-        <button id="mobile-menu-btn" onclick="openMobileSidebar()" class="absolute top-3 left-4 z-40 p-2.5 bg-white/80 dark:bg-slate-800/80 backdrop-blur border border-gray-200 dark:border-slate-700 rounded-full shadow-lg hover:scale-110 transition-all items-center justify-center">
+        <button id="mobile-menu-btn" onclick="openMobileSidebar()" class="glass-pill absolute top-3 left-4 z-40 p-2.5 rounded-full hover:scale-110 transition-all items-center justify-center">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
 
@@ -491,7 +558,7 @@
 
                     <!-- Upload button — icon-only on mobile, label on md+ -->
                     <button onclick="document.getElementById('file-input').click()"
-                            class="group relative flex-shrink-0 flex items-center justify-center gap-2 px-3 md:px-4 py-3 mb-1 bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-400 rounded-2xl border border-gray-300 dark:border-slate-700 shadow-sm hover:text-indian-red hover:border-indian-red/50 transition-colors"
+                            class="glass-pill group relative flex-shrink-0 flex items-center justify-center gap-2 px-3 md:px-4 py-3 mb-1 text-gray-600 dark:text-slate-400 rounded-2xl hover:text-indian-red transition-colors"
                             title="Upload Document">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="13" x2="12" y2="17"></line><line x1="10" y1="15" x2="14" y2="15"></line></svg>
                         <span class="hidden md:inline text-sm font-semibold whitespace-nowrap">Upload Docs</span>
@@ -504,7 +571,7 @@
                     </button>
 
                     <!-- Textarea form -->
-                    <form id="chat-form" class="flex-1 relative flex items-end bg-gray-50 dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-[2rem] shadow-2xl px-4 py-2 ring-1 ring-black/5 min-w-0">
+                    <form id="chat-form" class="glass-surface flex-1 relative flex items-end rounded-[2rem] px-4 py-2 min-w-0">
                         <!-- @mention autocomplete popup -->
                         <div id="at-mention-popup" class="hidden"></div>
                         <textarea id="message-input" rows="1" placeholder="Message… use @filename to target a document"
@@ -529,8 +596,8 @@
     </main>
 
     <!-- ── Settings Modal ──────────────────────────────────────────────── -->
-    <div id="settings-modal" class="hidden fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg shadow-2xl border border-gray-200 dark:border-slate-800 overflow-hidden animate-zoom-in">
+    <div id="settings-modal" class="hidden fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="glass-surface rounded-3xl w-full max-w-lg overflow-hidden animate-zoom-in">
             <div class="p-6 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center">
                 <div>
                     <h2 class="text-xl font-bold">Settings</h2>
@@ -542,7 +609,7 @@
             <div class="p-6 space-y-5 max-h-[70vh] overflow-y-auto no-scrollbar">
 
                 <!-- Remote URL -->
-                <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                <div class="surface-inset p-4 rounded-2xl">
                     <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Remote URL (Leave blank when running locally)</label>
                     <div class="flex gap-2">
                         <input id="config-backend" type="text" placeholder="use tailscale, cloudflared (blank = same origin)" class="flex-1 bg-white dark:bg-slate-800 p-3 rounded-xl outline-none border border-gray-200 dark:border-slate-700 focus:border-indian-red transition-all font-mono text-xs">
@@ -555,7 +622,7 @@
                 </div>
 
                 <!-- Data Storage Path -->
-                <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                <div class="surface-inset p-4 rounded-2xl">
                     <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Data Storage Path (Leave blank for default <code class="bg-gray-200 dark:bg-slate-700 px-1 rounded">./data</code>)</label>
                     <input id="config-data-dir" type="text" placeholder="e.g. /mnt/rag-data or ~/protorag-data" class="w-full bg-white dark:bg-slate-800 p-3 rounded-xl outline-none border border-gray-200 dark:border-slate-700 focus:border-indian-red transition-all font-mono text-xs">
                     <div class="text-[10px] text-gray-400 mt-1">Path on the <b>backend host</b> where vector DB and documents are stored. Will be created if it doesn't exist.</div>
@@ -603,7 +670,7 @@
                 </div>
 
                 <!-- Provider cheat-sheet -->
-                <div class="bg-gray-50 dark:bg-slate-800/40 rounded-2xl border border-gray-100 dark:border-slate-800 p-4">
+                <div class="surface-inset rounded-2xl p-4">
                     <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3">Provider quick-reference</p>
                     <div class="overflow-x-auto">
                         <table class="w-full text-[11px] text-gray-500 dark:text-slate-400 min-w-[360px]">
@@ -628,7 +695,7 @@
                 </div>
             </div>
 
-            <div class="p-6 bg-gray-50 dark:bg-slate-800/50 flex justify-end gap-3 border-t border-gray-100 dark:border-slate-800">
+            <div class="surface-inset p-6 flex justify-end gap-3 border-t" style="border-top-color: var(--surface-divider);">
                 <button onclick="toggleSettingsModal()" class="px-5 py-2.5 rounded-xl font-bold text-sm text-gray-500 hover:text-gray-700 transition-colors">Cancel</button>
                 <button onclick="saveSettings()" class="bg-indian-red text-white px-8 py-2.5 rounded-xl font-bold shadow-lg hover:brightness-110 active:scale-95 transition-all text-sm">Save Changes</button>
             </div>
@@ -636,8 +703,8 @@
     </div>
 
     <!-- ── Documentation Modal ─────────────────────────────────────────── -->
-    <div id="docs-modal" class="hidden fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4" onclick="if(event.target===this) toggleDocsModal()">
-        <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-2xl shadow-2xl border border-gray-200 dark:border-slate-800 overflow-hidden animate-zoom-in">
+    <div id="docs-modal" class="hidden fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-md flex items-center justify-center p-4" onclick="if(event.target===this) toggleDocsModal()">
+        <div class="glass-surface rounded-3xl w-full max-w-2xl overflow-hidden animate-zoom-in">
             <div class="p-6 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center">
                 <div>
                     <h2 class="text-xl font-bold">Documentation</h2>
@@ -649,7 +716,7 @@
             <div class="p-6 space-y-5 max-h-[70vh] overflow-y-auto no-scrollbar text-sm text-gray-700 dark:text-slate-300 leading-relaxed">
 
                 <!-- What is dynamic RAG -->
-                <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                <div class="surface-inset p-4 rounded-2xl">
                     <h3 class="text-[11px] font-bold text-indian-red uppercase tracking-wider mb-2">Dynamic RAG</h3>
                     <p>
                         protoRAG⁺ is a <b>dynamic RAG</b> system: each chat session has its own vector index that you can grow,
@@ -659,7 +726,7 @@
                 </div>
 
                 <!-- Quick Start (Local) -->
-                <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                <div class="surface-inset p-4 rounded-2xl">
                     <h3 class="text-[11px] font-bold text-indian-red uppercase tracking-wider mb-2">Quick Start — run locally with your own Ollama</h3>
                     <p class="mb-3">
                         Use the deployed website with <b>your own LLM and your own storage</b>. Run the backend on your machine
@@ -692,7 +759,7 @@
                 </div>
 
                 <!-- 1. Session modes -->
-                <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                <div class="surface-inset p-4 rounded-2xl">
                     <h3 class="text-[11px] font-bold text-indian-red uppercase tracking-wider mb-3">1 · Session lifecycle</h3>
                     <div class="space-y-3">
                         <div class="flex gap-3">
@@ -724,7 +791,7 @@
                 </div>
 
                 <!-- 2. Document workflow -->
-                <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                <div class="surface-inset p-4 rounded-2xl">
                     <h3 class="text-[11px] font-bold text-indian-red uppercase tracking-wider mb-3">2 · Document workflow</h3>
                     <div class="space-y-3">
                         <div class="flex gap-3">
@@ -759,7 +826,7 @@
                 </div>
 
                 <!-- 3. Isolation -->
-                <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                <div class="surface-inset p-4 rounded-2xl">
                     <h3 class="text-[11px] font-bold text-indian-red uppercase tracking-wider mb-2">3 · Per-session isolation</h3>
                     <p>
                         Every session has its own vector collection and document folder under
@@ -769,7 +836,7 @@
                 </div>
 
                 <!-- 4. Tips -->
-                <div class="bg-gray-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-gray-100 dark:border-slate-800">
+                <div class="surface-inset p-4 rounded-2xl">
                     <h3 class="text-[11px] font-bold text-indian-red uppercase tracking-wider mb-2">Tips</h3>
                     <ul class="list-disc pl-5 space-y-1.5 text-[13px]">
                         <li>If you change the embedding model in Settings, re-upload documents — old vectors won't match the new model.</li>
@@ -779,7 +846,7 @@
                 </div>
             </div>
 
-            <div class="p-6 bg-gray-50 dark:bg-slate-800/50 flex justify-end border-t border-gray-100 dark:border-slate-800">
+            <div class="surface-inset p-6 flex justify-end border-t" style="border-top-color: var(--surface-divider);">
                 <button onclick="toggleDocsModal()" class="bg-indian-red text-white px-8 py-2.5 rounded-xl font-bold shadow-lg hover:brightness-110 active:scale-95 transition-all text-sm">Got it</button>
             </div>
         </div>

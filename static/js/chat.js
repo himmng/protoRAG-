@@ -25,7 +25,7 @@ export function appendMessage(role, content) {
     const div   = document.createElement('div');
     div.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`;
     const inner = document.createElement('div');
-    inner.className = `max-w-[90%] md:max-w-[85%] p-4 rounded-2xl ${role === 'user' ? 'bg-indian-red text-white rounded-tr-none shadow-md' : 'bg-gray-100 dark:bg-slate-800 dark:text-slate-100 rounded-tl-none border border-gray-200 dark:border-slate-700 shadow-sm'} prose dark:prose-invert prose-sm`;
+    inner.className = `max-w-[90%] md:max-w-[85%] p-4 rounded-2xl ${role === 'user' ? 'bg-indian-red text-white rounded-tr-none shadow-md' : 'glass-pill dark:text-slate-100 rounded-tl-none'} prose dark:prose-invert prose-sm`;
     inner.innerHTML = content.includes('animate-gear') ? content : DOMPurify.sanitize(marked.parse(content));
     div.appendChild(inner);
     container.appendChild(div);

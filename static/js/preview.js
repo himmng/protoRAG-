@@ -11,7 +11,7 @@ export function openDocModal(filename) {
 
     const overlay = document.createElement('div');
     overlay.id = 'doc-modal-overlay';
-    overlay.className = 'fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 md:p-10 animate-fade-in';
+    overlay.className = 'fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-md flex items-center justify-center p-4 md:p-10 animate-fade-in';
     overlay.onclick = (e) => { if (e.target === overlay) closeDocModal(); };
 
     const fileUrl    = apiWithDataDir(`/api/sessions/${state.currentSessionId}/documents/${encodeURIComponent(filename)}`);
@@ -20,8 +20,8 @@ export function openDocModal(filename) {
     const officeExts = ['docx', 'doc', 'pptx', 'ppt', 'xlsx', 'xls'];
 
     overlay.innerHTML = `
-        <div class="relative w-full max-w-5xl h-[85vh] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden animate-zoom-in">
-            <div class="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm sticky top-0 z-10">
+        <div class="glass-surface relative w-full max-w-5xl h-[85vh] rounded-3xl flex flex-col overflow-hidden animate-zoom-in">
+            <div class="flex items-center justify-between p-4 border-b border-slate-100/60 dark:border-slate-800/60 sticky top-0 z-10">
                 <div class="flex items-center gap-3">
                     <div class="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-indian-red">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
@@ -35,10 +35,10 @@ export function openDocModal(filename) {
                     <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
                 </button>
             </div>
-            <div id="doc-modal-content-area" class="flex-1 overflow-hidden bg-slate-50/50 dark:bg-slate-950/50">
+            <div id="doc-modal-content-area" class="flex-1 overflow-hidden">
                 <div class="flex items-center justify-center h-full"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indian-red"></div></div>
             </div>
-            <div class="p-3 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2 bg-white dark:bg-slate-900">
+            <div class="p-3 border-t border-slate-100/60 dark:border-slate-800/60 flex justify-end gap-2">
                 <a href="${fileUrl}" download="${filename}" class="flex items-center gap-2 px-4 py-2 bg-indian-red text-white text-xs font-bold rounded-xl hover:opacity-90 transition-opacity">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                     Download
