@@ -7,6 +7,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response
 from ..config import DATA_DIR
 from .db import (
     User,
+    create_anonymous_user,
     create_auth_token,
     delete_user,
     find_user_by_token,
@@ -19,10 +20,12 @@ from .deps import (
     AUTH_COOKIE,
     AUTH_TTL_SECONDS,
     GUEST_COOKIE,
+    GUEST_TTL_SECONDS,
     clear_auth_cookie,
     clear_guest_cookie,
     current_user,
     set_auth_cookie,
+    set_guest_cookie,
 )
 from .google import google_client_id, verify_id_token
 
@@ -37,6 +40,37 @@ def me(user: User = Depends(current_user)):
         "user": user.to_public_dict(),
         "google_client_id": google_client_id(),
     }
+
+
+@router.get("/api/auth/status")
+def auth_status(request: Request):
+    """Non-minting probe used by the frontend gate.
+
+    Returns whether the caller already has a valid session WITHOUT setting any
+    cookie. Lets the UI show a "continue as guest / sign in" landing screen
+    on the very first visit instead of silently minting a guest behind the
+    user's back.
+    """
+    for cookie_name in (AUTH_COOKIE, GUEST_COOKIE):
+        token = request.cookies.get(cookie_name)
+        if token:
+            u = find_user_by_token(token)
+            if u:
+                return {
+                    "authenticated": True,
+                    "user": u.to_public_dict(),
+                    "google_client_id": google_client_id(),
+                }
+    return {"authenticated": False, "google_client_id": google_client_id()}
+
+
+@router.post("/api/auth/guest")
+def continue_as_guest(response: Response):
+    """Explicit guest minter — fires only when the user clicks 'Continue as guest'."""
+    user = create_anonymous_user()
+    token = create_auth_token(user.user_id, "guest", GUEST_TTL_SECONDS)
+    set_guest_cookie(response, token)
+    return {"user": user.to_public_dict()}
 
 
 @router.post("/api/auth/logout")

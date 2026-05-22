@@ -31,14 +31,20 @@ AUTH_TTL_SECONDS = 30 * 24 * 3600
 # Secure cookies on plain http://localhost otherwise — keep off in dev.
 COOKIE_SECURE = os.environ.get("PROTORAG_COOKIE_SECURE", "").lower() in ("1", "true", "yes")
 
+# When the frontend is on a different origin than the backend (e.g. Netlify
+# frontend → tunneled backend), the auth cookie must be SameSite=None so the
+# browser sends it on cross-site fetches. Browsers REQUIRE Secure=true with
+# SameSite=None — so we only flip this when COOKIE_SECURE is on.
+COOKIE_SAMESITE = "none" if COOKIE_SECURE else "lax"
 
-def _set_guest_cookie(response: Response, token: str) -> None:
+
+def set_guest_cookie(response: Response, token: str) -> None:
     response.set_cookie(
         key=GUEST_COOKIE,
         value=token,
         max_age=GUEST_TTL_SECONDS,
         httponly=True,
-        samesite="lax",
+        samesite=COOKIE_SAMESITE,
         secure=COOKIE_SECURE,
         path="/",
     )
@@ -51,7 +57,7 @@ def set_auth_cookie(response: Response, token: str) -> None:
         value=token,
         max_age=AUTH_TTL_SECONDS,
         httponly=True,
-        samesite="lax",
+        samesite=COOKIE_SAMESITE,
         secure=COOKIE_SECURE,
         path="/",
     )
@@ -82,5 +88,5 @@ def current_user(request: Request, response: Response) -> User:
 
     user = create_anonymous_user()
     token = create_auth_token(user.user_id, "guest", GUEST_TTL_SECONDS)
-    _set_guest_cookie(response, token)
+    set_guest_cookie(response, token)
     return user

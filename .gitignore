@@ -1,5 +1,6 @@
 nginx
 .env
+.env.example
 *.log
 *.pid
 *.sock

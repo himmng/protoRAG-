@@ -218,6 +218,117 @@
             letter-spacing: 0.03em;
         }
 
+        /* ── Auth gate ────────────────────────────────────────────────── */
+        #auth-gate {
+            background:
+                radial-gradient(1000px 700px at 12% -10%, rgba(205,92,92,0.22), transparent 60%),
+                radial-gradient(800px 600px at 110% 115%, rgba(205,92,92,0.14), transparent 55%),
+                linear-gradient(180deg, #fdfaf8 0%, #ffffff 100%);
+            animation: gateFadeIn 0.45s ease-out both;
+        }
+        .dark #auth-gate {
+            background:
+                radial-gradient(1000px 700px at 12% -10%, rgba(205,92,92,0.26), transparent 60%),
+                radial-gradient(800px 600px at 110% 115%, rgba(205,92,92,0.16), transparent 55%),
+                linear-gradient(180deg, #0b1220 0%, #020617 100%);
+        }
+        @keyframes gateFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        #auth-gate .gate-card {
+            position: relative;
+            background: rgba(255, 255, 255, 0.74);
+            backdrop-filter: saturate(160%) blur(18px);
+            -webkit-backdrop-filter: saturate(160%) blur(18px);
+            border: 1px solid rgba(15, 23, 42, 0.06);
+            box-shadow:
+                0 1px 0 rgba(255, 255, 255, 0.85) inset,
+                0 40px 80px -24px rgba(205, 92, 92, 0.18),
+                0 30px 60px -20px rgba(15, 23, 42, 0.18),
+                0 8px 20px -8px rgba(15, 23, 42, 0.08);
+        }
+        .dark #auth-gate .gate-card {
+            background: rgba(15, 23, 42, 0.58);
+            border-color: rgba(148, 163, 184, 0.10);
+            box-shadow:
+                0 1px 0 rgba(255, 255, 255, 0.05) inset,
+                0 40px 80px -24px rgba(205, 92, 92, 0.20),
+                0 30px 60px -20px rgba(0, 0, 0, 0.6),
+                0 8px 20px -8px rgba(0, 0, 0, 0.4);
+        }
+        /* Subtle top highlight on the card (looks like reflected light) */
+        #auth-gate .gate-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            pointer-events: none;
+            background: linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0) 32%);
+            mix-blend-mode: overlay;
+        }
+        .dark #auth-gate .gate-card::before {
+            background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0) 32%);
+        }
+
+        /* Brand tile sits above an animated halo */
+        #auth-gate .brand-wrap { position: relative; }
+        #auth-gate .brand-halo {
+            position: absolute;
+            inset: -26px;
+            border-radius: 50%;
+            background: radial-gradient(closest-side, rgba(205,92,92,0.42), transparent 70%);
+            filter: blur(14px);
+            z-index: 0;
+            animation: haloPulse 5s ease-in-out infinite;
+            pointer-events: none;
+        }
+        .dark #auth-gate .brand-halo {
+            background: radial-gradient(closest-side, rgba(205,92,92,0.55), transparent 70%);
+        }
+        @keyframes haloPulse {
+            0%, 100% { transform: scale(1);    opacity: 0.75; }
+            50%      { transform: scale(1.08); opacity: 1;    }
+        }
+        #auth-gate .brand-tile {
+            position: relative;
+            z-index: 1;
+            background: linear-gradient(180deg, #ffffff 0%, #fdf3f0 100%);
+            border: 1px solid rgba(205, 92, 92, 0.22);
+            box-shadow:
+                0 1px 0 rgba(255, 255, 255, 0.9) inset,
+                0 14px 28px -10px rgba(205, 92, 92, 0.30);
+        }
+        .dark #auth-gate .brand-tile {
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+            border-color: rgba(205, 92, 92, 0.32);
+            box-shadow:
+                0 1px 0 rgba(255, 255, 255, 0.05) inset,
+                0 14px 28px -10px rgba(205, 92, 92, 0.40);
+        }
+
+        /* Secondary "Continue as guest" button — quieter than Google's */
+        #auth-gate .ghost-btn {
+            background: rgba(15, 23, 42, 0.02);
+            border: 1px solid rgba(15, 23, 42, 0.09);
+            box-shadow: 0 1px 0 rgba(255,255,255,0.65) inset;
+            transition: transform 0.15s ease, border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+        }
+        #auth-gate .ghost-btn:hover {
+            background: rgba(205, 92, 92, 0.06);
+            border-color: rgba(205, 92, 92, 0.40);
+            box-shadow: 0 1px 0 rgba(255,255,255,0.85) inset, 0 6px 14px -8px rgba(205, 92, 92, 0.30);
+        }
+        #auth-gate .ghost-btn:active { transform: scale(0.985); }
+        .dark #auth-gate .ghost-btn {
+            background: rgba(148, 163, 184, 0.04);
+            border-color: rgba(148, 163, 184, 0.14);
+            box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset;
+        }
+        .dark #auth-gate .ghost-btn:hover {
+            background: rgba(205, 92, 92, 0.10);
+            border-color: rgba(205, 92, 92, 0.50);
+            box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 6px 14px -8px rgba(205, 92, 92, 0.40);
+        }
+
         /* ── @mention pill tags inside the textarea area ─────────────── */
         .at-pill {
             display: inline-flex;
@@ -234,6 +345,54 @@
     </style>
 </head>
 <body class="bg-white dark:bg-slate-950 text-gray-900 dark:text-slate-100 font-sans h-screen flex overflow-hidden">
+
+    <!-- ── Auth gate (shown until the user picks guest or Google) ───────── -->
+    <div id="auth-gate" class="hidden fixed inset-0 z-50 flex items-center justify-center p-6">
+        <div class="gate-card relative w-full max-w-md rounded-3xl p-8 sm:p-10 flex flex-col items-center animate-zoom-in">
+
+            <!-- Brand -->
+            <div class="flex flex-col items-center gap-5 mb-9">
+                <div class="brand-wrap">
+                    <div class="brand-halo"></div>
+                    <div class="brand-tile w-16 h-16 rounded-2xl flex items-center justify-center">
+                        <svg width="40" height="40" viewBox="0 0 100 100" fill="none">
+                            <path d="M50 15C58 15 65 22 65 30C73 30 80 37 80 45C80 53 73 60 65 60C65 68 58 75 50 75C42 75 35 68 35 60C27 60 20 53 20 45C20 37 27 30 35 30C35 22 42 15 50 15Z" fill="#CD5C5C"/>
+                            <circle cx="50" cy="45" r="8" fill="#CD5C5C" stroke="white" stroke-width="2"/>
+                        </svg>
+                    </div>
+                </div>
+                <div class="flex flex-col items-center gap-1.5">
+                    <h1 class="font-bold text-[28px] tracking-tight text-[#CD5C5C] leading-none">protoRAG⁺</h1>
+                    <p class="text-[10.5px] uppercase tracking-[0.22em] text-gray-400 dark:text-slate-500 font-medium">Private RAG for your documents</p>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="w-full flex flex-col gap-5">
+                <div id="auth-gate-google" class="w-full flex justify-center min-h-[44px]"></div>
+
+                <div class="flex items-center gap-3 text-[10px] font-medium uppercase tracking-[0.2em] text-gray-400 dark:text-slate-600">
+                    <div class="flex-1 h-px bg-gradient-to-r from-transparent via-gray-200 dark:via-slate-700 to-transparent"></div>
+                    <span>or</span>
+                    <div class="flex-1 h-px bg-gradient-to-r from-transparent via-gray-200 dark:via-slate-700 to-transparent"></div>
+                </div>
+
+                <button id="auth-gate-guest" class="ghost-btn group w-full py-3 px-4 rounded-2xl text-sm font-medium text-gray-700 dark:text-slate-200 flex items-center justify-center gap-2">
+                    <span>Continue as guest</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                        <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                </button>
+            </div>
+
+            <p class="mt-8 text-[10px] text-gray-400 dark:text-slate-500 text-center leading-relaxed max-w-[260px]">
+                Guests get a private workspace tied to this browser. Sign in to sync across devices.
+            </p>
+
+            <p id="auth-gate-error" class="hidden mt-4 text-xs text-red-500 text-center"></p>
+        </div>
+    </div>
 
     <!-- Mobile sidebar backdrop -->
     <div id="sidebar-backdrop" onclick="closeMobileSidebar()"></div>

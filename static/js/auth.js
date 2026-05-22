@@ -1,12 +1,10 @@
 // Google sign-in + user-profile pill in the sidebar.
 //
 // Flow:
-//   1. `/api/auth/me` returns {user, google_client_id}. `user.kind` is either
-//      'anonymous' (a guest cookie was issued) or 'google'.
-//   2. If user is 'google', render the profile pill.
-//   3. If user is 'anonymous' AND google_client_id is non-null, lazy-load
-//      Google Identity Services and render the sign-in button.
-//   4. If anonymous and no GOOGLE_CLIENT_ID, render nothing (graceful degrade).
+//   1. `bootAuth()` calls `/api/auth/status` (non-minting). If no session,
+//      show the gate overlay and resolve only after the user picks "Continue
+//      as guest" or signs in with Google.
+//   2. Once a session exists, render the sidebar pill via `refreshAuthUI()`.
 
 import { api, apiFetch } from './api.js';
 import { escapeHtml, state } from './config.js';
@@ -31,29 +29,20 @@ function loadGIS() {
 }
 
 function renderGuestPill(slot, user, clientId) {
-    const shortId = (user.user_id || '').slice(0, 8);
-    const signInBlock = clientId
-        ? `<div id="gis-button" class="flex justify-center pt-1"></div>
-           <p class="text-[10px] text-gray-400 dark:text-slate-500 text-center mt-1 nav-text">Sign in to sync sessions across devices.</p>`
-        : `<p class="text-[10px] text-gray-400 dark:text-slate-500 text-center nav-text leading-snug">
-              Google sign-in not configured.
-              <br>Set <code>GOOGLE_CLIENT_ID</code> in the backend env to enable.
-           </p>`;
-
     slot.innerHTML = `
-        <div class="pb-3">
-            <div class="flex items-center gap-3 mb-2">
-                <div class="w-8 h-8 rounded-full bg-gray-200 dark:bg-slate-800 text-gray-500 dark:text-slate-400 flex items-center justify-center text-xs font-bold flex-shrink-0">?</div>
-                <div class="nav-text flex-1 min-w-0">
-                    <div class="text-xs font-semibold text-gray-700 dark:text-slate-200">Guest</div>
-                    <div class="text-[10px] text-gray-400 dark:text-slate-500 truncate" title="${escapeHtml(user.user_id || '')}">id: ${escapeHtml(shortId)}…</div>
-                </div>
+        <div class="pb-3 flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full bg-gray-200 dark:bg-slate-800 text-gray-500 dark:text-slate-400 flex items-center justify-center text-xs font-bold flex-shrink-0">?</div>
+            <div class="nav-text flex-1 min-w-0">
+                <div class="text-xs font-semibold text-gray-700 dark:text-slate-200">Guest</div>
             </div>
-            ${signInBlock}
+            ${clientId ? `<div id="gis-button-pill" class="nav-text flex-shrink-0"></div>` : ''}
+            <button id="auth-signout-btn" title="Sign out" class="nav-text p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors flex-shrink-0">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            </button>
         </div>`;
+    document.getElementById('auth-signout-btn').addEventListener('click', signOut);
 
     if (!clientId) return;
-
     loadGIS().then(() => {
         google.accounts.id.initialize({
             client_id: clientId,
@@ -62,13 +51,10 @@ function renderGuestPill(slot, user, clientId) {
             ux_mode: 'popup',
         });
         google.accounts.id.renderButton(
-            document.getElementById('gis-button'),
-            { theme: 'outline', size: 'medium', shape: 'pill', text: 'signin_with' },
+            document.getElementById('gis-button-pill'),
+            { theme: 'outline', size: 'small', shape: 'pill', type: 'icon' },
         );
-    }).catch((err) => {
-        const target = document.getElementById('gis-button');
-        if (target) target.innerHTML = `<p class="text-[10px] text-red-500 nav-text">${escapeHtml(err.message)}</p>`;
-    });
+    }).catch(() => { /* fall through: button just won't appear */ });
 }
 
 function renderProfilePill(slot, user) {
@@ -101,13 +87,12 @@ async function handleCredentialResponse(response) {
             const err = await res.json().catch(() => ({}));
             throw new Error(err.detail || `HTTP ${res.status}`);
         }
-        // Refresh the UI now that the user is authenticated. Existing guest
-        // sessions (if any) were merged on the server; re-fetch the list to
-        // show them under the new identity.
+        hideGate();
         await refreshAuthUI();
         await loadSessions();
         if (state.currentSessionId) await loadSessionHistory(state.currentSessionId);
     } catch (err) {
+        showGateError(`Sign-in failed: ${err.message}`);
         alert(`Sign-in failed: ${err.message}`);
     }
 }
@@ -116,11 +101,12 @@ async function signOut() {
     try {
         await apiFetch(api('/api/auth/logout'), { method: 'POST' });
     } catch (_) { /* still clear local UI even if request failed */ }
-    // After logout, /api/auth/me will mint a fresh guest user. Refresh
-    // everything so the UI reflects the empty guest state.
-    await refreshAuthUI();
-    await loadSessions();
     document.getElementById('messages').innerHTML = '';
+    document.getElementById('session-list').innerHTML = '';
+    document.getElementById('auth-slot').innerHTML = '';
+    // Drop the user back at the gate so they can pick again.
+    await bootAuth();
+    await loadSessions();
 }
 
 export async function refreshAuthUI() {
@@ -135,9 +121,6 @@ export async function refreshAuthUI() {
         if (user.kind === 'google') {
             renderProfilePill(slot, user);
         } else {
-            // Always render a guest pill so the user can see auth state at a
-            // glance. The sign-in button only appears if GOOGLE_CLIENT_ID is
-            // configured on the backend — otherwise we surface a hint.
             renderGuestPill(slot, user, cid);
         }
     } catch (_) {
@@ -145,6 +128,88 @@ export async function refreshAuthUI() {
     }
 }
 
-export function initAuth() {
-    refreshAuthUI();
+// ── Gate ──────────────────────────────────────────────────────────────────
+
+function showGate() {
+    const gate = document.getElementById('auth-gate');
+    if (gate) gate.classList.remove('hidden');
+}
+
+function hideGate() {
+    const gate = document.getElementById('auth-gate');
+    if (gate) gate.classList.add('hidden');
+}
+
+function showGateError(msg) {
+    const el = document.getElementById('auth-gate-error');
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.remove('hidden');
+}
+
+function wireGateGoogle(clientId) {
+    const target = document.getElementById('auth-gate-google');
+    if (!target) return;
+    if (!clientId) {
+        target.innerHTML = `<p class="text-[11px] text-gray-400 dark:text-slate-500 text-center leading-snug">
+              Google sign-in not configured.
+              <br>Set <code>GOOGLE_CLIENT_ID</code> in the backend env to enable.
+           </p>`;
+        return;
+    }
+    loadGIS().then(() => {
+        google.accounts.id.initialize({
+            client_id: clientId,
+            callback: handleCredentialResponse,
+            auto_select: false,
+            ux_mode: 'popup',
+        });
+        google.accounts.id.renderButton(
+            target,
+            { theme: 'outline', size: 'large', shape: 'pill', text: 'continue_with', logo_alignment: 'center', width: 360 },
+        );
+    }).catch((err) => {
+        target.innerHTML = `<p class="text-[11px] text-red-500 text-center">${escapeHtml(err.message)}</p>`;
+    });
+}
+
+async function continueAsGuest() {
+    try {
+        const res = await apiFetch(api('/api/auth/guest'), { method: 'POST' });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || `HTTP ${res.status}`);
+        }
+        hideGate();
+        await refreshAuthUI();
+        await loadSessions();
+    } catch (err) {
+        showGateError(`Could not start guest session: ${err.message}`);
+    }
+}
+
+/**
+ * Resolve the auth state on app load. If the user already has a session,
+ * render the sidebar pill. Otherwise show the gate and resolve when the user
+ * picks an option (the picker handlers themselves continue the boot flow).
+ */
+export async function bootAuth() {
+    let data;
+    try {
+        const res = await apiFetch(api('/api/auth/status'));
+        data = res.ok ? await res.json() : { authenticated: false };
+    } catch (_) {
+        data = { authenticated: false };
+    }
+
+    if (data.authenticated) {
+        await refreshAuthUI();
+        return { gated: false };
+    }
+
+    // Wire the gate, show it, and let user actions drive the rest.
+    document.getElementById('auth-gate-guest').addEventListener('click', continueAsGuest, { once: false });
+    wireGateGoogle(data.google_client_id);
+    showGate();
+    return { gated: true };
 }

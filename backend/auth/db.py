@@ -64,12 +64,34 @@ def _users_db_path() -> str:
     return os.path.join(base, "users.db")
 
 
+_SCHEMA_READY = False
+
+
+def _init_db() -> None:
+    """Create tables once and switch the DB to WAL so readers don't block writers."""
+    global _SCHEMA_READY
+    if _SCHEMA_READY:
+        return
+    c = sqlite3.connect(_users_db_path(), timeout=30.0)
+    try:
+        c.execute("PRAGMA journal_mode=WAL")
+        c.execute("PRAGMA synchronous=NORMAL")
+        c.executescript(_SCHEMA)
+        c.commit()
+    finally:
+        c.close()
+    _SCHEMA_READY = True
+
+
 @contextmanager
 def _conn() -> Iterator[sqlite3.Connection]:
-    c = sqlite3.connect(_users_db_path())
+    _init_db()
+    # busy_timeout makes concurrent writers wait briefly instead of failing
+    # with "database is locked" the instant they contend.
+    c = sqlite3.connect(_users_db_path(), timeout=30.0)
     c.row_factory = sqlite3.Row
+    c.execute("PRAGMA busy_timeout=30000")
     try:
-        c.executescript(_SCHEMA)
         yield c
         c.commit()
     finally:

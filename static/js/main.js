@@ -9,7 +9,7 @@ import * as chat from './chat.js';
 import * as preview from './preview.js';
 import * as settings from './settings.js';
 import * as mentions from './mentions.js';
-import { initAuth } from './auth.js';
+import { bootAuth } from './auth.js';
 import { state } from './config.js';
 
 // index.html uses inline `onclick="fnName()"` attributes for several controls.
@@ -34,13 +34,19 @@ Object.assign(window, {
     handleAtMentionKey:    mentions.handleAtMentionKey,
 });
 
-document.addEventListener('DOMContentLoaded', () => {
-    sessions.loadSessions();
-    sessions.loadSessionHistory(state.currentSessionId);
+document.addEventListener('DOMContentLoaded', async () => {
     settings.updateConfigUI();
     chat.updateSendStopBtn();
     chat.initChatForm();
-    initAuth();
+
+    // Gate the app behind an explicit auth choice. While the gate is shown,
+    // do NOT call any user-scoped endpoints — that would auto-mint a guest
+    // behind the user's back via the FastAPI dep.
+    const { gated } = await bootAuth();
+    if (!gated) {
+        sessions.loadSessions();
+        sessions.loadSessionHistory(state.currentSessionId);
+    }
 
     const msgInput = document.getElementById('message-input');
     msgInput.addEventListener('keydown', (e) => {
