@@ -1,12 +1,18 @@
 """FastAPI dependency that resolves the requester to a User.
 
 Resolution order on every request:
-  1. `pr_auth` cookie  → real signed-in user (Google in Phase D).
-  2. `pr_guest` cookie → existing anonymous user.
-  3. Mint a fresh anonymous user, drop a 1-year `pr_guest` cookie.
+  1. `Authorization: Bearer <token>` header → bearer auth (Netlify ↔ localhost).
+  2. `pr_auth` cookie  → real signed-in user (Google in Phase D).
+  3. `pr_guest` cookie → existing anonymous user.
+  4. Mint a fresh anonymous user, drop a 1-year `pr_guest` cookie.
 
-The third path is what preserves the "open and use" UX: no sign-in required,
-but every request is bound to a stable user_id so storage stays isolated.
+The bearer path exists because the Netlify-hosted frontend talking to a local
+backend (https → http://localhost) hits browser-specific cookie quirks
+(SameSite=None+Secure on plain-http localhost). Bearer tokens stored in
+localStorage sidestep all of it. Same token table as cookies, no schema split.
+
+The last path preserves the "open and use" UX: no sign-in required, but every
+request is bound to a stable user_id so storage stays isolated.
 """
 
 import os
@@ -71,7 +77,25 @@ def clear_guest_cookie(response: Response) -> None:
     response.delete_cookie(GUEST_COOKIE, path="/")
 
 
+def _bearer_token(request: Request) -> str | None:
+    """Pull the bearer token out of Authorization, if present."""
+    header = request.headers.get("authorization") or request.headers.get("Authorization")
+    if not header:
+        return None
+    parts = header.split(None, 1)
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        return None
+    return parts[1].strip() or None
+
+
 def current_user(request: Request, response: Response) -> User:
+    bearer = _bearer_token(request)
+    if bearer:
+        user = find_user_by_token(bearer)
+        if user is not None:
+            touch_user(user.user_id)
+            return user
+
     auth_token = request.cookies.get(AUTH_COOKIE)
     if auth_token:
         user = find_user_by_token(auth_token)

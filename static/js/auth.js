@@ -6,7 +6,7 @@
 //      as guest" or signs in with Google.
 //   2. Once a session exists, render the sidebar pill via `refreshAuthUI()`.
 
-import { api, apiFetch } from './api.js';
+import { api, apiFetch, setToken } from './api.js';
 import { escapeHtml, state } from './config.js';
 import { loadSessions, loadSessionHistory } from './sessions.js';
 
@@ -139,6 +139,8 @@ async function handleCredentialResponse(response) {
             const err = await res.json().catch(() => ({}));
             throw new Error(err.detail || `HTTP ${res.status}`);
         }
+        const data = await res.json().catch(() => ({}));
+        if (data.token) setToken(data.token);
         hideGate();
         await refreshAuthUI();
         await loadSessions();
@@ -153,6 +155,7 @@ async function signOut() {
     try {
         await apiFetch(api('/api/auth/logout'), { method: 'POST' });
     } catch (_) { /* still clear local UI even if request failed */ }
+    setToken(null);
     document.getElementById('messages').innerHTML = '';
     document.getElementById('session-list').innerHTML = '';
     document.getElementById('auth-slot').innerHTML = '';
@@ -232,6 +235,8 @@ async function continueAsGuest() {
             const err = await res.json().catch(() => ({}));
             throw new Error(err.detail || `HTTP ${res.status}`);
         }
+        const data = await res.json().catch(() => ({}));
+        if (data.token) setToken(data.token);
         hideGate();
         await refreshAuthUI();
         await loadSessions();

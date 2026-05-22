@@ -30,6 +30,7 @@ async def upload_document(
     model_name: str = Form(...),
     embedding_model: str = Form(...),
     data_dir: Optional[str] = Form(None),
+    relative_path: Optional[str] = Form(None),
     file: UploadFile = File(...),
     user: User = Depends(current_user),
 ):
@@ -58,10 +59,17 @@ async def upload_document(
         with open(file_path, "wb") as f:
             f.write(content)
 
+        # Display name: prefer the folder-relative path the browser supplied
+        # (set by webkitdirectory uploads) so users see "subdir/foo.pdf"
+        # instead of just "foo.pdf" when two files share a basename.
+        display_name = (relative_path or "").strip() or filename
+
         docs = load_document(file_path, filename)
         splits = get_text_splitter().split_documents(docs)
         for chunk in splits:
             chunk.metadata["doc_filename"] = filename
+            if display_name != filename:
+                chunk.metadata["doc_display_name"] = display_name
 
         if not splits:
             return {"status": "warning", "message": f"'{filename}' was saved but produced 0 text chunks — it may be empty, image-only, or unsupported internally. RAG will not work for this file."}

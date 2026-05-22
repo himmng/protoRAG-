@@ -38,7 +38,25 @@ export async function testBackendConnection() {
         status.className = 'text-[10px] text-green-600 dark:text-green-400 mt-1';
     } catch (err) {
         dot.className = 'inline-block w-2 h-2 rounded-full bg-red-500';
-        const msg = err.name === 'AbortError' ? 'timeout (5s)' : (err.message || 'unreachable');
+        let msg;
+        if (err.name === 'AbortError') {
+            msg = 'timeout (5s) — backend not running?';
+        } else if (err instanceof TypeError) {
+            // Browser refused the request before it ever left. Most common
+            // causes when target is http://localhost from an HTTPS page:
+            //   • backend not running on that port
+            //   • CORS preflight rejected (PROTORAG_CORS_ORIGINS missing the
+            //     Netlify origin)
+            //   • Private Network Access preflight not approved
+            // The native error string is identical in all three, so we list
+            // the checks rather than guess.
+            const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(raw);
+            msg = 'blocked by browser. Check: backend is running, '
+                + (isLocal ? 'and ' : 'CORS allows this origin, and ')
+                + 'open the README "Local backend" section for the docker compose command.';
+        } else {
+            msg = err.message || 'unreachable';
+        }
         status.textContent = 'Cannot reach ' + target + ' — ' + msg;
         status.className = 'text-[10px] text-red-600 dark:text-red-400 mt-1';
     }

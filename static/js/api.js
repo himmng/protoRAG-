@@ -1,11 +1,30 @@
-// URL builders + a thin fetch wrapper that always sends auth cookies.
+// URL builders + a thin fetch wrapper that handles cross-origin auth.
 //
-// `credentials: 'include'` is mandatory for cross-origin Mode B deployments
-// (Netlify static frontend → remote backend) so the `pr_guest` / `pr_auth`
-// cookies actually traverse the origin boundary. Same-origin requests behave
-// identically with this flag, so the default is safe everywhere.
+// Two transports are supported in parallel:
+//   1. Cookies (`credentials: 'include'`) — works when the frontend and
+//      backend share an origin, or when the backend is reached over HTTPS
+//      with `PROTORAG_COOKIE_SECURE=true`.
+//   2. Bearer token in `Authorization: Bearer …` — required when the Netlify
+//      static frontend points at a local backend on `http://localhost:8000`,
+//      where SameSite=None+Secure cookies behave inconsistently across
+//      browsers. The token is minted by /api/auth/guest or /api/auth/google
+//      and persisted in localStorage by static/js/auth.js.
 
 import { config } from './config.js';
+
+const TOKEN_KEY = 'pr_token';
+
+export function getToken() {
+    try { return localStorage.getItem(TOKEN_KEY) || ''; }
+    catch (_) { return ''; }
+}
+
+export function setToken(token) {
+    try {
+        if (token) localStorage.setItem(TOKEN_KEY, token);
+        else localStorage.removeItem(TOKEN_KEY);
+    } catch (_) { /* private mode / quota — auth still degrades to cookie path */ }
+}
 
 export function api(path) {
     return (config.backend_url || '').replace(/\/$/, '') + path;
@@ -20,5 +39,10 @@ export function apiWithDataDir(path) {
 }
 
 export function apiFetch(url, options = {}) {
-    return fetch(url, { credentials: 'include', ...options });
+    const token = getToken();
+    const headers = new Headers(options.headers || {});
+    if (token && !headers.has('Authorization')) {
+        headers.set('Authorization', `Bearer ${token}`);
+    }
+    return fetch(url, { credentials: 'include', ...options, headers });
 }

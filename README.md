@@ -197,6 +197,63 @@ Ensure `index.html` is present in the project root so the UI is served at `/`.
 
 ---
 
+## Use the live Netlify demo with a fully local backend
+
+If you don't want to expose your backend at all — keep it on `127.0.0.1` —
+the live demo at <https://protorag.netlify.app> can talk straight to a
+locally-running container. Only your **Ollama** model needs to be reachable
+(it can also stay local, or be tunneled via tailscale / cloudflared if it
+lives on a different machine).
+
+```bash
+docker compose -f docker-compose.local.yml up
+```
+
+That single command:
+
+- Pulls the published `ghcr.io/himmng/protorag+:latest` image.
+- Binds port `8000` to `127.0.0.1` only — the backend is never on your LAN.
+- Pre-sets `PROTORAG_CORS_ORIGINS=https://protorag.netlify.app` so cross-origin
+  fetches from the deployed site succeed.
+- Mounts `~/protorag_storage` into the container as `/data`; your vector DB,
+  documents, and `users.db` live on your disk.
+
+Then in your browser:
+
+1. Open <https://protorag.netlify.app>.
+2. Click **Continue as guest** (or sign in with Google if you have
+   `GOOGLE_CLIENT_ID` set in the compose env).
+3. Open **Settings** and set:
+   - **Backend URL** → `http://localhost:8000`. Click **Test** — the dot
+     should turn green.
+   - **Base URL** → your Ollama endpoint, either `http://localhost:11434`
+     for a same-machine Ollama, or a tailscale / cloudflared URL if Ollama
+     runs elsewhere.
+   - **Provider**, **LLM Model**, **Embedding Model** → as you'd configure
+     them anywhere else.
+4. Upload documents (or click the folder icon to ingest a whole directory)
+   and chat.
+
+### How auth crosses the origin boundary
+
+In this layout, Netlify is HTTPS and your backend is plain
+`http://localhost`. Browsers treat `SameSite=None` cookies on plain-http
+inconsistently, so the backend now also issues a **bearer token** in the
+JSON body of `/api/auth/guest` and `/api/auth/google`. The frontend stores
+it in `localStorage` and sends it as `Authorization: Bearer …` on every
+fetch — no cookie quirks. Same-origin deployments are unaffected: cookies
+still work, the bearer header is just additive.
+
+### How browsers permit HTTPS → http://localhost
+
+Chrome's [Private Network Access](https://wicg.github.io/private-network-access/)
+spec requires an explicit opt-in from the backend when an HTTPS page hits a
+private IP. The backend's PNA middleware
+([backend/app.py](backend/app.py)) handles this preflight automatically;
+no browser flags needed.
+
+---
+
 ## Deploying the frontend on Netlify (with local backend)
 
 The frontend is a static SPA — Netlify just serves the files. All API calls

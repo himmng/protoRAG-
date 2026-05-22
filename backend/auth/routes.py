@@ -21,6 +21,7 @@ from .deps import (
     AUTH_TTL_SECONDS,
     GUEST_COOKIE,
     GUEST_TTL_SECONDS,
+    _bearer_token,
     clear_auth_cookie,
     clear_guest_cookie,
     current_user,
@@ -51,16 +52,19 @@ def auth_status(request: Request):
     on the very first visit instead of silently minting a guest behind the
     user's back.
     """
-    for cookie_name in (AUTH_COOKIE, GUEST_COOKIE):
-        token = request.cookies.get(cookie_name)
-        if token:
-            u = find_user_by_token(token)
-            if u:
-                return {
-                    "authenticated": True,
-                    "user": u.to_public_dict(),
-                    "google_client_id": google_client_id(),
-                }
+    candidates = []
+    bearer = _bearer_token(request)
+    if bearer:
+        candidates.append(bearer)
+    candidates.extend(t for t in (request.cookies.get(AUTH_COOKIE), request.cookies.get(GUEST_COOKIE)) if t)
+    for token in candidates:
+        u = find_user_by_token(token)
+        if u:
+            return {
+                "authenticated": True,
+                "user": u.to_public_dict(),
+                "google_client_id": google_client_id(),
+            }
     return {"authenticated": False, "google_client_id": google_client_id()}
 
 
@@ -70,7 +74,14 @@ def continue_as_guest(response: Response):
     user = create_anonymous_user()
     token = create_auth_token(user.user_id, "guest", GUEST_TTL_SECONDS)
     set_guest_cookie(response, token)
-    return {"user": user.to_public_dict()}
+    # Token is also returned in the body so cross-origin clients (Netlify
+    # frontend → localhost backend) can store it in localStorage and send it
+    # as `Authorization: Bearer …` instead of relying on the cookie.
+    return {
+        "user": user.to_public_dict(),
+        "token": token,
+        "expires_in": GUEST_TTL_SECONDS,
+    }
 
 
 @router.post("/api/auth/logout")
@@ -83,6 +94,9 @@ def logout(
     # cookies. The dep may have just minted a fresh guest if neither cookie
     # was valid — that's harmless; the cookies we clear below ensure the
     # client starts clean on the next request.
+    bearer = _bearer_token(request)
+    if bearer:
+        revoke_auth_token(bearer)
     for cookie_name in (AUTH_COOKIE, GUEST_COOKIE):
         token = request.cookies.get(cookie_name)
         if token:
@@ -118,6 +132,8 @@ def google_login(
     # Mint a fresh auth session and swap cookies.
     token = create_auth_token(user.user_id, "google", AUTH_TTL_SECONDS)
     set_auth_cookie(response, token)
+    # Same token is echoed in the body for the bearer-auth path (see
+    # /api/auth/guest above for the rationale).
 
     # Optional one-shot merge: if the requester arrived with a valid guest
     # cookie that points at a different (anonymous) user, fold that user's
@@ -136,5 +152,7 @@ def google_login(
 
     return {
         "user": user.to_public_dict(),
+        "token": token,
+        "expires_in": AUTH_TTL_SECONDS,
         "merged_sessions": merged_sessions,
     }
