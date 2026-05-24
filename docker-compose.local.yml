@@ -1,0 +1,43 @@
+# One-command launcher for the "Netlify frontend + fully local backend" setup.
+#
+#   docker compose -f docker-compose.local.yml up
+#
+# After it boots, open https://protorag.netlify.app/, sign in (Google or
+# guest), then in Settings paste `http://localhost:8000` as the Backend URL
+# and your Ollama tunnel URL as the LLM Base URL. Auth uses a bearer token
+# stored in your browser's localStorage — no cookie cross-origin tricks
+# required.
+
+services:
+  protorag-backend:
+    image: ghcr.io/himmng/protorag+:latest
+    container_name: protorag-local
+    ports:
+      # Bind to 127.0.0.1 so the backend is never reachable from the LAN.
+      # Chrome's Private Network Access preflight (handled in
+      # backend/app.py) lets the HTTPS Netlify page reach 127.0.0.1.
+      - "127.0.0.1:8000:8000"
+    environment:
+      # Allowlist the public frontend so cross-origin requests work and the
+      # backend emits Access-Control-Allow-Credentials. localhost:3000 is
+      # included so you can also test against `npm run dev`.
+      PROTORAG_CORS_ORIGINS: "https://protorag.netlify.app,http://localhost:3000,http://localhost:8000"
+      # Harmless when only bearer auth is used; helpful if you later put the
+      # backend behind HTTPS and want cookies to flow.
+      PROTORAG_COOKIE_SECURE: "true"
+      DEFAULT_DATA_DIR: "/data"
+      # Optional. If you want Google sign-in to work against the local
+      # backend, drop your OAuth client ID here (and add the Netlify origin
+      # to Authorized JavaScript origins in Google Cloud Console).
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+    volumes:
+      # All RAG data — vector DB, originals, users.db — lives on YOUR disk
+      # under ~/protorag_storage. Nothing ever leaves the machine.
+      - "${HOME}/protorag_storage:/data"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://127.0.0.1:8000/api/health').status == 200 else sys.exit(1)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3

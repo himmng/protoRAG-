@@ -1,5 +1,6 @@
 nginx
 .env
+.env.example
 *.log
 *.pid
 *.sock
@@ -18,4 +19,5 @@ __pycache__/
 .netlify
 data/
 node_modules/
+protorag_storage/
 

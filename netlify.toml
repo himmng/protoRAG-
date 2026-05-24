@@ -1,0 +1,12 @@
+# Static SPA — Netlify just serves the files in the repo root.
+# All API calls go to the user-configured backend URL via
+# state.backendUrl, so no redirects or functions are needed.
+
+[build]
+  publish = "."
+  command = ""
+
+[[headers]]
+  for = "/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
