@@ -1,6 +1,6 @@
 // Streaming chat: form submit, SSE reader, send/stop button state, message rendering.
 
-import { config, state } from './config.js';
+import { config, state, escapeHtml } from './config.js';
 import { api, apiFetch } from './api.js';
 import { loadSessions } from './sessions.js';
 
@@ -23,6 +23,20 @@ export function updateSendStopBtn() {
 export function appendMessage(role, content) {
     const container = document.getElementById('messages');
     const div   = document.createElement('div');
+
+    if (role === 'system_notice') {
+        // Centered red pill — visually distinct from chat bubbles. Marks
+        // server-emitted chat ↔ RAG mode transitions; never markdown-parsed.
+        div.className = 'flex justify-center animate-fade-in my-3';
+        const inner = document.createElement('div');
+        inner.className = 'px-4 py-2 rounded-full bg-indian-red/10 text-indian-red text-[12px] font-semibold tracking-wide border border-indian-red/20 select-none text-center max-w-[90%]';
+        inner.textContent = content;
+        div.appendChild(inner);
+        container.appendChild(div);
+        document.getElementById('chat-container').scrollTo({ top: 999999, behavior: 'smooth' });
+        return inner;
+    }
+
     div.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`;
     const inner = document.createElement('div');
     inner.className = `max-w-[90%] md:max-w-[85%] p-4 rounded-2xl ${role === 'user' ? 'bg-indian-red text-white rounded-tr-none shadow-md' : 'glass-pill dark:text-slate-100 rounded-tl-none'} prose dark:prose-invert prose-sm`;
@@ -31,6 +45,17 @@ export function appendMessage(role, content) {
     container.appendChild(div);
     document.getElementById('chat-container').scrollTo({ top: 999999, behavior: 'smooth' });
     return inner;
+}
+
+export function renderSourcesFooter(parentInner, sources) {
+    if (!sources || !sources.length) return;
+    const foot = document.createElement('div');
+    foot.className = 'mt-3 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 text-[11px] text-slate-500 dark:text-slate-400 select-none not-prose';
+    const chips = sources.map(s =>
+        `<span class="inline-block px-2 py-0.5 mr-1 mb-1 rounded-md bg-slate-100 dark:bg-slate-800 font-mono">${escapeHtml(s)}</span>`
+    ).join('');
+    foot.innerHTML = `<span class="font-bold uppercase tracking-widest mr-2">Sources</span>${chips}`;
+    parentInner.appendChild(foot);
 }
 
 export function initChatForm() {
@@ -62,6 +87,7 @@ export function initChatForm() {
         updateSendStopBtn();
 
         let fullText = "";
+        let pendingSources = null;
         try {
             const response = await apiFetch(api('/api/chat'), {
                 method: 'POST',
@@ -94,11 +120,21 @@ export function initChatForm() {
                     if (dataStr === '[DONE]') break;
                     try {
                         const parsed = JSON.parse(dataStr);
+                        if (parsed.type === 'sources') {
+                            pendingSources = parsed.files || [];
+                            continue;
+                        }
+                        // Guard: non-content events (e.g. future control messages)
+                        // shouldn't corrupt the text buffer with `undefined`.
+                        if (typeof parsed.content !== 'string') continue;
                         if (fullText === "") assistantMsgDiv.innerHTML = "";
                         fullText += parsed.content;
                         assistantMsgDiv.innerHTML = DOMPurify.sanitize(marked.parse(fullText));
                     } catch (_) {}
                 }
+            }
+            if (pendingSources && pendingSources.length) {
+                renderSourcesFooter(assistantMsgDiv, pendingSources);
             }
             loadSessions();
         } catch (err) {

@@ -14,6 +14,7 @@ from ..auth.deps import current_user
 from ..config import _OFFICE_EXTS, _PREVIEW_DIRNAME
 from ..paths import _validate_session, resolve_dirs, safe_join
 from ..rag.chroma import _delete_vectors_for_file, _release_session
+from ..rag.history import append_system_notice
 from ..state import _session_locks
 
 
@@ -130,16 +131,20 @@ async def delete_document(
     safe_filename = os.path.basename(filename)
     file_path = safe_join(session_dir, safe_filename)
 
-    if os.path.exists(file_path):
-        os.remove(file_path)
-        print(f"[DOC] Removed '{safe_filename}' from session '{user.user_id}/{session_id}'")
-
     _clear_preview_cache_for(session_dir, safe_filename)
 
     db_path = safe_join(db_dir, session_id, "chromadb")
     remaining = []
 
     async with _session_locks[(user.user_id, session_id)]:
+        # Remove the file inside the lock so the prev-count snapshot is
+        # consistent with the post-state — prevents a concurrent upload from
+        # racing in between os.remove and the transition check below.
+        file_existed = os.path.exists(file_path)
+        if file_existed:
+            os.remove(file_path)
+            print(f"[DOC] Removed '{safe_filename}' from session '{user.user_id}/{session_id}'")
+
         _delete_vectors_for_file(db_path, session_id, safe_filename)
 
         remaining = [
@@ -165,5 +170,12 @@ async def delete_document(
                     json.dump(meta, f)
             except Exception:
                 pass
+
+        if file_existed and not remaining:
+            append_system_notice(
+                session_id,
+                db_dir,
+                "Chat mode resumed — all documents removed. Replies are no longer grounded in any documents.",
+            )
 
     return {"status": "success", "remaining_documents": remaining}

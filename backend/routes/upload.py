@@ -14,6 +14,7 @@ from ..config import ALLOWED_EXTENSIONS, MAX_UPLOAD_BYTES, ChatConfig
 from ..paths import _validate_session, resolve_dirs, safe_join
 from ..rag.chroma import _release_session, get_vectorstore
 from ..rag.embeddings import get_embeddings
+from ..rag.history import append_system_notice
 from ..rag.loaders import get_text_splitter, load_document
 from ..state import _session_locks
 
@@ -93,6 +94,7 @@ async def upload_document(
                     pass
 
             indexed_files: set = set(meta.get("indexed_files", []))
+            prev_count = len(indexed_files)
             is_reupload = filename in indexed_files
 
             if is_reupload:
@@ -134,6 +136,13 @@ async def upload_document(
                     "provider": config.provider,
                     "indexed_files": sorted(indexed_files),
                 }, f)
+
+            if prev_count == 0 and len(indexed_files) > 0:
+                append_system_notice(
+                    session_id,
+                    db_dir,
+                    "RAG mode enabled — replies will now be grounded in your uploaded documents.",
+                )
 
         return {"status": "success", "message": f"Indexed {filename} ({len(splits)} chunks)."}
 

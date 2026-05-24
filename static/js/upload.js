@@ -5,6 +5,7 @@ import { api, apiFetch } from './api.js';
 import { appendMessage } from './chat.js';
 import { loadSessionHistory } from './sessions.js';
 
+
 // Mirrors backend.config.ALLOWED_EXTENSIONS — used to silently skip files
 // inside a webkitdirectory upload that the backend would reject anyway
 // (.DS_Store, .git/*, binary blobs, etc.).
@@ -43,14 +44,8 @@ export async function uploadFiles(files) {
     if (skipped > 0) {
         appendMessage('assistant', `Skipping ${skipped} unsupported / hidden file${skipped === 1 ? '' : 's'} in selection.`);
     }
-    // Snapshot before the batch so we can announce a chat → RAG mode flip
-    // once the whole batch settles (one notice per batch, not per file).
-    const wasChatOnly = (state.sessionDocs?.length || 0) === 0;
     for (const file of accepted) {
         await uploadFile(file);
-    }
-    if (wasChatOnly && (state.sessionDocs?.length || 0) > 0) {
-        appendMessage('assistant', '**RAG session started.** Replies will be grounded in your uploaded documents. Remove all documents to switch back to a regular chat session.');
     }
 }
 

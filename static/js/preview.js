@@ -3,7 +3,6 @@
 import { state, escapeHtml } from './config.js';
 import { apiWithDataDir, apiFetch } from './api.js';
 import { loadSessionHistory } from './sessions.js';
-import { appendMessage } from './chat.js';
 
 export function openDocModal(filename) {
     if (!state.currentSessionId) return;
@@ -96,7 +95,6 @@ export function closeDocModal() {
 export async function deleteDocument(filename, e) {
     if (e) e.stopPropagation();
     if (!confirm(`Remove "${filename}" from this session?\n\nIts vectors will be deleted from the RAG index immediately.`)) return;
-    const wasRag = (state.sessionDocs?.length || 0) > 0;
     try {
         const res = await apiFetch(
             apiWithDataDir(`/api/sessions/${state.currentSessionId}/documents/${encodeURIComponent(filename)}`),
@@ -104,9 +102,6 @@ export async function deleteDocument(filename, e) {
         );
         if (res.ok) {
             await loadSessionHistory(state.currentSessionId);
-            if (wasRag && (state.sessionDocs?.length || 0) === 0) {
-                appendMessage('assistant', '**Chat session resumed.** All documents have been removed — replies will no longer be grounded in any documents.');
-            }
         } else {
             const err = await res.json().catch(() => ({}));
             alert(`Delete failed: ${err.detail || res.statusText}`);

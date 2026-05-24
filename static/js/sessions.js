@@ -3,7 +3,7 @@
 import { state, setCurrentSessionId, escapeHtml } from './config.js';
 import { apiWithDataDir, apiFetch } from './api.js';
 import { setSessionDocs } from './mentions.js';
-import { appendMessage } from './chat.js';
+import { appendMessage, renderSourcesFooter } from './chat.js';
 import { openDocModal, deleteDocument } from './preview.js';
 
 export async function loadSessions() {
@@ -86,7 +86,12 @@ export async function loadSessionHistory(sid) {
         const container = document.getElementById('messages');
         container.innerHTML = '';
         if (!data.history || data.history.length === 0) renderWelcome();
-        else data.history.forEach(msg => appendMessage(msg.role, msg.content));
+        else data.history.forEach(msg => {
+            const inner = appendMessage(msg.role, msg.content);
+            if (msg.role === 'assistant' && msg.sources && msg.sources.length) {
+                renderSourcesFooter(inner, msg.sources);
+            }
+        });
         updateDocBar(data.documents || []);
         loadSessions();
     } catch (e) { console.error(e); }

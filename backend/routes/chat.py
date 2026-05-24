@@ -40,6 +40,7 @@ async def chat(request: ChatRequest, user: User = Depends(current_user)):
     db_path = os.path.join(db_dir, session_id, "chromadb")
     context = ""
     retrieval_warning = ""
+    sources: list[str] = []
 
     if os.path.exists(db_path):
         try:
@@ -104,8 +105,8 @@ async def chat(request: ChatRequest, user: User = Depends(current_user)):
                     print(f"[RAG] @filter {where_filter} → {len(docs)} chunks")
             else:
                 docs = vectorstore.max_marginal_relevance_search(query, k=k, fetch_k=fetch_k)
-                sources = list({d.metadata.get("doc_filename", "?") for d in docs})
-                print(f"[RAG] MMR → {len(docs)} chunks from {sources}")
+                print(f"[RAG] MMR → {len(docs)} chunks from "
+                      f"{sorted({d.metadata.get('doc_filename', '?') for d in docs})}")
 
             if docs:
                 grouped: dict[str, list[str]] = {}
@@ -116,6 +117,7 @@ async def chat(request: ChatRequest, user: User = Depends(current_user)):
                     f"### Source: {src}\n" + "\n\n".join(chunks)
                     for src, chunks in grouped.items()
                 )
+                sources = sorted(grouped.keys())
 
         except Exception as e:
             print(f"[RAG] Retrieval error: {e}")
@@ -170,7 +172,10 @@ async def chat(request: ChatRequest, user: User = Depends(current_user)):
     sys_prompt = (
         "You are a helpful and intelligent AI assistant. "
         f"{doc_list_note} "
-        "When answering from document context, always specify which document your answer comes from."
+        "When answering from document context, always specify which document your answer comes from. "
+        "If the retrieved context does not contain information relevant to the user's question, "
+        "reply exactly: 'No information about that is present in the uploaded documents.' "
+        "Do NOT use prior knowledge to fill gaps when documents are provided."
     )
     messages = [SystemMessage(content=sys_prompt)]
     for msg in history[-10:]:
@@ -221,10 +226,16 @@ async def chat(request: ChatRequest, user: User = Depends(current_user)):
             full_response += retrieval_warning
             yield f"data: {json.dumps({'content': retrieval_warning})}\n\n"
 
+        if sources:
+            yield f"data: {json.dumps({'type': 'sources', 'files': sources})}\n\n"
+
         async with lock:
             current = load_history(session_id, db_dir)
             current.append({"role": "user", "content": query})
-            current.append({"role": "assistant", "content": full_response})
+            assistant_entry: dict = {"role": "assistant", "content": full_response}
+            if sources:
+                assistant_entry["sources"] = sources
+            current.append(assistant_entry)
             save_history(session_id, current, db_dir)
 
         yield "data: [DONE]\n\n"
