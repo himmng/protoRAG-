@@ -36,7 +36,8 @@ export async function loadSessions() {
 }
 
 export function updateDocBar(docs) {
-    setSessionDocs(docs);   // keep @mention autocomplete in sync
+    state.sessionDocs = docs || [];
+    setSessionDocs(state.sessionDocs);   // keep @mention autocomplete in sync
     const section = document.getElementById('sidebar-docs');
     const pills   = document.getElementById('doc-pills');
     if (!docs || docs.length === 0) { section.classList.add('hidden'); return; }

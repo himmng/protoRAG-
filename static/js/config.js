@@ -48,6 +48,7 @@ if (savedConfig) Object.assign(config, JSON.parse(savedConfig));
 // the same path: read `state.currentSessionId`, write `setCurrentSessionId(...)`.)
 export const state = {
     currentSessionId: localStorage.getItem('last_session_id') || crypto.randomUUID(),
+    sessionDocs: [],
 };
 
 export function setCurrentSessionId(sid) {
