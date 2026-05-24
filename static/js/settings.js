@@ -1,5 +1,6 @@
 // Settings modal, provider-defaults toggling, backend health probe, dark mode.
 
+import { ensureBackendSession, getMode, setToken } from './api.js';
 import { config, PROVIDER_DEFAULTS, URL_HINTS, state } from './config.js';
 import { loadSessions, loadSessionHistory } from './sessions.js';
 
@@ -84,7 +85,8 @@ export function updateConfigUI() {
     document.getElementById('config-key').value = config.api_key;
 }
 
-export function saveSettings() {
+export async function saveSettings() {
+    const prevBackendUrl = config.backend_url;
     const prevDataDir = config.data_dir;
     config.backend_url     = document.getElementById('config-backend').value.trim();
     config.data_dir        = document.getElementById('config-data-dir').value.trim();
@@ -95,10 +97,22 @@ export function saveSettings() {
     config.embedding_model = document.getElementById('config-embed').value.trim();
     localStorage.setItem('app_config', JSON.stringify(config));
     toggleSettingsModal();
-    // If the data dir changed, reload sessions from the new location.
-    if (prevDataDir !== config.data_dir) {
-        loadSessions();
-        loadSessionHistory(state.currentSessionId);
+
+    // If the backend URL just changed, the old token (if any) was minted by
+    // a different backend and can't be reused. Drop it so the next API
+    // call mints a fresh session against the new backend.
+    if (prevBackendUrl !== config.backend_url) setToken(null);
+
+    // Re-attempt the backend session against (possibly new) URL. Updates
+    // the no-backend banner as a side-effect. Only meaningful once the
+    // user has picked an identity at the gate.
+    if (getMode()) await ensureBackendSession();
+
+    if (prevBackendUrl !== config.backend_url || prevDataDir !== config.data_dir) {
+        try {
+            await loadSessions();
+            await loadSessionHistory(state.currentSessionId);
+        } catch { /* banner already surfaces the unreachable case */ }
     }
 }
 

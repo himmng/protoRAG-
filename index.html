@@ -458,6 +458,25 @@
             </p>
 
             <p id="auth-gate-error" class="hidden mt-4 text-xs text-red-500 text-center"></p>
+
+            <button type="button" onclick="toggleSettingsModal()"
+                    class="mt-5 text-[11px] text-gray-400 dark:text-slate-500 hover:text-indian-red transition-colors underline underline-offset-2 decoration-dotted">
+                Configure backend URL
+            </button>
+        </div>
+    </div>
+
+    <!-- Backend-not-connected banner. Shown by api.js when ensureBackendSession
+         fails after the user has chosen an identity. -->
+    <div id="no-backend-banner" class="hidden fixed top-0 inset-x-0 z-40 bg-amber-50 dark:bg-amber-900/40 border-b border-amber-200 dark:border-amber-800 px-4 py-2">
+        <div class="max-w-4xl mx-auto flex items-center justify-between gap-3 text-[12px]">
+            <div class="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                <span id="no-backend-banner-msg">Backend not connected. Start your local backend or set the Backend URL.</span>
+            </div>
+            <button type="button" onclick="toggleSettingsModal()" class="flex-shrink-0 px-3 py-1 rounded-lg bg-amber-600 text-white text-[11px] font-semibold hover:brightness-110 transition-all">
+                Open Settings
+            </button>
         </div>
     </div>
 
@@ -610,7 +629,7 @@
     </main>
 
     <!-- ── Settings Modal ──────────────────────────────────────────────── -->
-    <div id="settings-modal" class="hidden fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-md flex items-center justify-center p-4">
+    <div id="settings-modal" class="hidden fixed inset-0 z-[60] bg-slate-950/40 backdrop-blur-md flex items-center justify-center p-4">
         <div class="glass-surface rounded-3xl w-full max-w-lg overflow-hidden animate-zoom-in">
             <div class="p-6 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center">
                 <div>

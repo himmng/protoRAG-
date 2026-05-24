@@ -1,5 +1,15 @@
 // Provider/UI defaults, the persisted config singleton, and currentSessionId.
 
+// Google OAuth client ID is public — shipping it with the frontend is what
+// lets the gate render the Google button BEFORE any backend is reachable.
+// The matching secret is never used here (GIS is the client-side flow).
+// Override per-deployment by setting `window.PROTORAG_GOOGLE_CLIENT_ID`
+// before main.js loads, or leave blank to fall back to the value the
+// backend reports via /api/auth/status once one is configured.
+export const PUBLIC_GOOGLE_CLIENT_ID =
+    (typeof window !== 'undefined' && window.PROTORAG_GOOGLE_CLIENT_ID) ||
+    '970498019467-97pb8cvibpo6nocudk7jhu6nthfasi2r.apps.googleusercontent.com';
+
 export const PROVIDER_DEFAULTS = {
     ollama:    { base_url: 'http://localhost:11434',     api_key: 'none',      hint: 'Auto-appends /v1 · needs OLLAMA_ORIGINS set' },
     lmstudio:  { base_url: 'http://localhost:1234',      api_key: 'lm-studio', hint: 'Auto-appends /v1 · LM Studio server mode' },
