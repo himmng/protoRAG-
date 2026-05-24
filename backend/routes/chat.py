@@ -177,8 +177,31 @@ async def chat(request: ChatRequest, user: User = Depends(current_user)):
         "reply exactly: 'No information about that is present in the uploaded documents.' "
         "Do NOT use prior knowledge to fill gaps when documents are provided."
     )
+    # When the session has dropped back to chat mode (no docs), hide every
+    # turn that happened inside a prior RAG span. Otherwise the LLM remembers
+    # document contents from its own earlier replies and "answers" about
+    # deleted docs from memory. The system_notice entries bracket each span:
+    # "RAG mode enabled" opens, "Chat mode resumed" closes.
+    effective_history = history
+    if not session_docs:
+        filtered = []
+        in_rag_span = False
+        for msg in history:
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+            if role == "system_notice":
+                if content.startswith("RAG mode enabled"):
+                    in_rag_span = True
+                elif content.startswith("Chat mode resumed"):
+                    in_rag_span = False
+                continue
+            if in_rag_span:
+                continue
+            filtered.append(msg)
+        effective_history = filtered
+
     messages = [SystemMessage(content=sys_prompt)]
-    for msg in history[-10:]:
+    for msg in effective_history[-10:]:
         role = msg.get("role", "")
         if role == "user":
             messages.append(HumanMessage(content=msg.get("content", "")))
