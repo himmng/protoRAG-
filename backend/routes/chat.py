@@ -163,20 +163,28 @@ async def chat(request: ChatRequest, user: User = Depends(current_user)):
         f for f in (os.listdir(session_doc_path) if os.path.exists(session_doc_path) else [])
         if os.path.isfile(os.path.join(session_doc_path, f))
     )
-    doc_list_note = (
-        f"The user has uploaded {len(session_docs)} document(s) to this session: "
-        + ", ".join(f'"{d}"' for d in session_docs)
-        + "."
-    ) if session_docs else "No documents have been uploaded to this session yet."
-
-    sys_prompt = (
-        "You are a helpful and intelligent AI assistant. "
-        f"{doc_list_note} "
-        "When answering from document context, always specify which document your answer comes from. "
-        "If the retrieved context does not contain information relevant to the user's question, "
-        "reply exactly: 'No information about that is present in the uploaded documents.' "
-        "Do NOT use prior knowledge to fill gaps when documents are provided."
-    )
+    if session_docs:
+        doc_list_note = (
+            f"The user has uploaded {len(session_docs)} document(s) to this session: "
+            + ", ".join(f'"{d}"' for d in session_docs)
+            + "."
+        )
+        sys_prompt = (
+            "You are a helpful and intelligent AI assistant. "
+            f"{doc_list_note} "
+            "When answering from document context, always specify which document your answer comes from. "
+            "If the retrieved context does not contain information relevant to the user's question, "
+            "reply exactly: 'No information about that is present in the uploaded documents.' "
+            "Do NOT use prior knowledge to fill gaps when documents are provided."
+        )
+    else:
+        # Plain chat mode — no documents attached. The RAG-specific
+        # "no information" instruction must NOT be included or the LLM
+        # parrots it on every general-knowledge question.
+        sys_prompt = (
+            "You are a helpful and intelligent AI assistant. "
+            "Answer the user's questions to the best of your ability."
+        )
     # When the session has dropped back to chat mode (no docs), hide every
     # turn that happened inside a prior RAG span. Otherwise the LLM remembers
     # document contents from its own earlier replies and "answers" about
