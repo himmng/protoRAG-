@@ -24,7 +24,15 @@ app = FastAPI(title="protoRAG+ API")
 # same-origin behavior without credentials.
 _cors_origins_env = os.environ.get("PROTORAG_CORS_ORIGINS", "").strip()
 if _cors_origins_env:
-    _allow_origins = [o.strip() for o in _cors_origins_env.split(",") if o.strip()]
+    # Per the CORS spec, an Origin is scheme+host+port — NEVER a trailing
+    # slash. Users routinely paste `https://site.netlify.app/` into .env
+    # and then get silent rejection because string comparison fails.
+    # Strip defensively here so the obvious mistake just works.
+    _allow_origins = [
+        o.strip().rstrip("/")
+        for o in _cors_origins_env.split(",")
+        if o.strip()
+    ]
     _allow_credentials = True
 else:
     _allow_origins = ["*"]
