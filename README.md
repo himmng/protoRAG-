@@ -206,12 +206,14 @@ locally-running container. Only your **Ollama** model needs to be reachable
 lives on a different machine).
 
 ```bash
-docker compose -f docker-compose.local.yml up
+docker compose -f docker-compose.local.yml up -d --build
 ```
 
 That single command:
 
-- Pulls the published `ghcr.io/himmng/protorag+:latest` image.
+- Builds the image locally from the repo `Dockerfile` (tagged
+  `protorag-local:latest`). The `+` in the repo name can't appear in a Docker
+  image reference, so the image is built rather than pulled from GHCR.
 - Binds port `8000` to `127.0.0.1` only — the backend is never on your LAN.
 - Pre-sets `PROTORAG_CORS_ORIGINS=https://protorag.netlify.app` so cross-origin
   fetches from the deployed site succeed.
@@ -251,6 +253,77 @@ spec requires an explicit opt-in from the backend when an HTTPS page hits a
 private IP. The backend's PNA middleware
 ([backend/app.py](backend/app.py)) handles this preflight automatically;
 no browser flags needed.
+
+---
+
+## One-click "Connect with backend" (bundled default)
+
+The auth gate at <https://protorag.netlify.app> shows a **Connect with backend**
+button as step 1, above the Google / guest sign-in options. It points at a
+backend baked into the frontend so users don't have to paste a URL. The default
+is defined in [`static/js/config.js`](static/js/config.js) and can be overridden
+at runtime with `window.PROTORAG_DEFAULT_BACKEND_URL`:
+
+```js
+export const DEFAULT_BACKEND_URL =
+    (typeof window !== 'undefined' && window.PROTORAG_DEFAULT_BACKEND_URL) ||
+    'https://my-ubuntu.tail8e3f2b.ts.net:8443';
+```
+
+Clicking the button applies the bundled defaults (provider `ollama`, LLM model
+`gemma-4-e4b:latest`, embedding model `embeddinggemma:latest`), probes
+`/api/health`, and shows a green/red result. The gate is shown on **every
+visit** so the backend + identity are re-confirmed each time.
+
+> The frontend talks to the **protoRAG FastAPI backend**, which in turn talks to
+> Ollama server-side — the browser never hits Ollama directly. So the default
+> URL must point at the FastAPI backend, not at Ollama's `:11434`.
+
+### Why `:8443` and not `:443`
+
+The Netlify page is HTTPS, so the backend must be HTTPS with a
+**browser-trusted** cert — a plain `http://…` backend is blocked as mixed
+content, and a self-signed cert is rejected. `tailscale serve` issues a real
+cert automatically. Port `443` is often already in use on a host (e.g. by
+Nextcloud), so this setup uses `8443`.
+
+### Server-side setup (run on the backend host)
+
+These steps run on the machine that hosts the backend (`my-ubuntu` in the
+default). The frontend can't do them for you.
+
+```bash
+# 1. Build & start the backend (binds 127.0.0.1:8000; CORS already allows Netlify).
+docker compose -f docker-compose.local.yml up -d --build
+
+# 2. Expose it over Tailscale with a real HTTPS cert on :8443.
+#    (443 is taken by Nextcloud on this host, so use 8443.)
+tailscale serve --bg --https=8443 http://127.0.0.1:8000
+
+# 3. Verify — this must return JSON like {"status":"ok",...}, not HTML.
+tailscale serve status
+curl -s https://my-ubuntu.tail8e3f2b.ts.net:8443/api/health
+```
+
+Once `curl` returns the health JSON, reload the Netlify site and **Connect with
+backend** turns green.
+
+### Backend → Ollama path (Docker only)
+
+The bundled LLM **Base URL** default is `http://localhost:11434`. When the
+backend runs **in Docker**, `localhost` is the *container*, not the host's
+Ollama, so model calls fail even after Connect succeeds. Fix it one of these
+ways:
+
+- add `extra_hosts: ["host.docker.internal:host-gateway"]` to the compose
+  service and set Base URL to `http://host.docker.internal:11434`, or
+- run the backend container with `network_mode: host`, or
+- run the backend **natively** on the host — then `http://localhost:11434`
+  is already correct.
+
+To change a different host/port, edit `DEFAULT_BACKEND_URL` in
+[`static/js/config.js`](static/js/config.js) (and match the `tailscale serve`
+port), or set `window.PROTORAG_DEFAULT_BACKEND_URL` before `main.js` loads.
 
 ---
 

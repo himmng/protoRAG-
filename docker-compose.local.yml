@@ -1,6 +1,6 @@
 # One-command launcher for the "Netlify frontend + fully local backend" setup.
 #
-#   docker compose -f docker-compose.local.yml up
+#   docker compose -f docker-compose.local.yml up -d --build
 #
 # After it boots, open https://protorag.netlify.app/, sign in (Google or
 # guest), then in Settings paste `http://localhost:8000` as the Backend URL
@@ -10,7 +10,13 @@
 
 services:
   protorag-backend:
-    image: ghcr.io/himmng/protorag+:latest
+    # Built locally from the Dockerfile in this repo. (The image can't be
+    # published to GHCR under the repo's literal name because Docker image
+    # references disallow "+", so we build instead of pull.)
+    #   docker compose -f docker-compose.local.yml up -d --build
+    build:
+      context: .
+    image: protorag-local:latest
     container_name: protorag-local
     ports:
       # Bind to 127.0.0.1 so the backend is never reachable from the LAN.

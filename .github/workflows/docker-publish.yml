@@ -8,7 +8,10 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  # Hardcoded because the repo name (protoRAG+) contains "+", which is illegal
+  # in a Docker image reference. Using ${{ github.repository }} produces an
+  # invalid tag like "protorag-:main". Keep this lowercase and "+"-free.
+  IMAGE_NAME: ${{ github.repository_owner }}/protorag
 
 jobs:
   build-and-push:
