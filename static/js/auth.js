@@ -17,9 +17,9 @@ import {
     api, apiFetch,
     clearAuth, ensureBackendSession,
     getGoogleProfile, getMode, getToken,
-    setGoogleIdToken, setGoogleProfile, setMode,
+    setGoogleIdToken, setGoogleProfile, setMode, setToken,
 } from './api.js';
-import { escapeHtml, PUBLIC_GOOGLE_CLIENT_ID, state } from './config.js';
+import { config, DEFAULT_BACKEND_URL, escapeHtml, PUBLIC_GOOGLE_CLIENT_ID, state } from './config.js';
 import { loadSessions, loadSessionHistory } from './sessions.js';
 
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
@@ -205,6 +205,63 @@ async function handleCredentialResponse(response) {
     } catch { /* no-backend state is surfaced by main.js */ }
 }
 
+// Step 1 of the gate: point the app at the default backend and confirm it's
+// reachable. Applies the bundled provider/model defaults too, then probes
+// /api/health so the user sees a green/red result before picking an identity.
+async function connectDefaultBackend() {
+    // This button is an explicit promise to use the bundled default backend,
+    // so force it even if a custom URL was previously configured. A backend
+    // change invalidates any token minted by the old one.
+    const switching = config.backend_url !== DEFAULT_BACKEND_URL;
+    config.backend_url = DEFAULT_BACKEND_URL;
+    applyDefaultBackend();
+    if (switching) setToken(null);
+
+    const btn      = document.getElementById('auth-gate-connect');
+    const statusEl = document.getElementById('auth-gate-connect-status');
+
+    const setStatus = (text, cls) => {
+        if (!statusEl) return;
+        statusEl.textContent = text;
+        statusEl.className = 'text-[10px] text-center leading-snug ' + cls;
+        statusEl.classList.remove('hidden');
+    };
+
+    if (btn) btn.disabled = true;
+    setStatus('Connecting to ' + DEFAULT_BACKEND_URL + '…', 'text-gray-400 dark:text-slate-500');
+
+    try {
+        const ctrl  = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 6000);
+        const res   = await fetch(DEFAULT_BACKEND_URL.replace(/\/$/, '') + '/api/health', { signal: ctrl.signal });
+        clearTimeout(timer);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json().catch(() => ({}));
+        setStatus('Connected — ' + (data.service || 'backend reachable') + '. Now sign in below.',
+                  'text-green-600 dark:text-green-400');
+    } catch (err) {
+        const msg = err.name === 'AbortError' ? 'timed out (6s) — is the backend up?'
+                  : (err instanceof TypeError) ? 'blocked by the browser — backend down, or CORS/HTTPS not allowing this origin.'
+                  : (err.message || 'unreachable');
+        setStatus('Could not reach ' + DEFAULT_BACKEND_URL + ' — ' + msg
+                  + ' You can still continue and fix the URL in Settings.',
+                  'text-red-600 dark:text-red-400');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+// Write the bundled backend + provider/model defaults into the live config and
+// persist them. Only fills the backend URL when none is set, so a user who
+// already configured a custom backend keeps it.
+function applyDefaultBackend() {
+    if (!config.backend_url) config.backend_url = DEFAULT_BACKEND_URL;
+    config.provider        = config.provider        || 'ollama';
+    config.model_name      = config.model_name      || 'gemma-4-e4b:latest';
+    config.embedding_model = config.embedding_model || 'embeddinggemma:latest';
+    try { localStorage.setItem('app_config', JSON.stringify(config)); } catch { /* private mode */ }
+}
+
 async function continueAsGuest() {
     setMode('guest');
     hideGate();
@@ -279,14 +336,11 @@ function wireGateGoogle(clientId) {
  * orthogonal — main.js surfaces that separately.
  */
 export async function bootAuth() {
-    if (getMode()) {
-        refreshAuthUI();
-        // Fire-and-forget backend exchange so the session token is ready
-        // before the first user-initiated API call.
-        ensureBackendSession();
-        return { gated: false };
-    }
-
+    // The gate is shown on every visit (even for returning users) so the
+    // backend + identity are re-confirmed each time. Make sure the default
+    // backend is in place so the gate's identity buttons work immediately.
+    applyDefaultBackend();
+    document.getElementById('auth-gate-connect').addEventListener('click', connectDefaultBackend, { once: false });
     document.getElementById('auth-gate-guest').addEventListener('click', continueAsGuest, { once: false });
     wireGateGoogle(PUBLIC_GOOGLE_CLIENT_ID);
     showGate();

@@ -64,7 +64,13 @@ export async function testBackendConnection() {
 }
 
 export function toggleSettingsModal() {
-    document.getElementById('settings-modal').classList.toggle('hidden');
+    const modal = document.getElementById('settings-modal');
+    const opening = modal.classList.contains('hidden');
+    // Re-sync the form from the live config each time the modal opens so it
+    // reflects defaults applied after page load (e.g. the gate's "Connect
+    // with backend" step). Otherwise Save would write back stale field values.
+    if (opening) updateConfigUI();
+    modal.classList.toggle('hidden');
 }
 
 export function toggleDocsModal() {

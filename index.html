@@ -372,6 +372,16 @@
                 0 14px 28px -10px rgba(205, 92, 92, 0.40);
         }
 
+        /* Primary "Connect with backend" button — the default step-1 CTA */
+        #auth-gate .connect-btn {
+            background: linear-gradient(180deg, #d96a6a 0%, #CD5C5C 100%);
+            box-shadow: 0 1px 0 rgba(255,255,255,0.25) inset, 0 8px 18px -10px rgba(205, 92, 92, 0.65);
+            transition: transform 0.15s ease, filter 0.2s ease, box-shadow 0.2s ease;
+        }
+        #auth-gate .connect-btn:hover { filter: brightness(1.05); box-shadow: 0 1px 0 rgba(255,255,255,0.3) inset, 0 10px 22px -10px rgba(205, 92, 92, 0.75); }
+        #auth-gate .connect-btn:active { transform: scale(0.985); }
+        #auth-gate .connect-btn:disabled { opacity: 0.65; cursor: default; transform: none; filter: none; }
+
         /* Secondary "Continue as guest" button — quieter than Google's */
         #auth-gate .ghost-btn {
             background: rgba(15, 23, 42, 0.02);
@@ -440,6 +450,32 @@
 
             <!-- Actions -->
             <div class="w-full flex flex-col gap-5">
+
+                <!-- Step 1 — pick a backend. The primary path connects to the
+                     default backend; "Configure backend URL" is the escape hatch. -->
+                <div class="flex flex-col gap-2.5">
+                    <button id="auth-gate-connect" class="connect-btn group w-full py-3 px-4 rounded-2xl text-sm font-semibold text-white flex items-center justify-center gap-2">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-90">
+                            <rect x="2" y="2" width="20" height="8" rx="2"></rect>
+                            <rect x="2" y="14" width="20" height="8" rx="2"></rect>
+                            <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                            <line x1="6" y1="18" x2="6.01" y2="18"></line>
+                        </svg>
+                        <span>Connect with backend</span>
+                    </button>
+                    <p id="auth-gate-connect-status" class="hidden text-[10px] text-center leading-snug"></p>
+                    <button type="button" onclick="toggleSettingsModal()"
+                            class="text-[11px] text-gray-400 dark:text-slate-500 hover:text-indian-red transition-colors underline underline-offset-2 decoration-dotted">
+                        Configure backend URL
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-3 text-[10px] font-medium uppercase tracking-[0.2em] text-gray-400 dark:text-slate-600">
+                    <div class="flex-1 h-px bg-gradient-to-r from-transparent via-gray-200 dark:via-slate-700 to-transparent"></div>
+                    <span>then sign in</span>
+                    <div class="flex-1 h-px bg-gradient-to-r from-transparent via-gray-200 dark:via-slate-700 to-transparent"></div>
+                </div>
+
                 <div id="auth-gate-google" class="w-full flex justify-center min-h-[44px]"></div>
 
                 <div class="flex items-center gap-3 text-[10px] font-medium uppercase tracking-[0.2em] text-gray-400 dark:text-slate-600">
@@ -462,11 +498,6 @@
             </p>
 
             <p id="auth-gate-error" class="hidden mt-4 text-xs text-red-500 text-center"></p>
-
-            <button type="button" onclick="toggleSettingsModal()"
-                    class="mt-5 text-[11px] text-gray-400 dark:text-slate-500 hover:text-indian-red transition-colors underline underline-offset-2 decoration-dotted">
-                Configure backend URL
-            </button>
         </div>
     </div>
 
