@@ -308,22 +308,47 @@ curl -s https://my-ubuntu.tail8e3f2b.ts.net:8443/api/health
 Once `curl` returns the health JSON, reload the Netlify site and **Connect with
 backend** turns green.
 
-### Backend → Ollama path (Docker only)
+### Everything runs on the backend host
 
-The bundled LLM **Base URL** default is `http://localhost:11434`. When the
-backend runs **in Docker**, `localhost` is the *container*, not the host's
-Ollama, so model calls fail even after Connect succeeds. Fix it one of these
-ways:
+In this setup the dockerized backend on `my-ubuntu` uses **that host's**
+resources for everything:
 
-- add `extra_hosts: ["host.docker.internal:host-gateway"]` to the compose
-  service and set Base URL to `http://host.docker.internal:11434`, or
-- run the backend container with `network_mode: host`, or
-- run the backend **natively** on the host — then `http://localhost:11434`
-  is already correct.
+| Resource | Where | How the container reaches it |
+|---|---|---|
+| LLM + embeddings (Ollama) | host Ollama on `:11434` | `http://host.docker.internal:11434` via the `extra_hosts` host-gateway alias |
+| Vector DB + documents + `users.db` | host disk `~/protorag_storage` | bind-mounted to `/data` (`DEFAULT_DATA_DIR=/data`) |
 
-To change a different host/port, edit `DEFAULT_BACKEND_URL` in
-[`static/js/config.js`](static/js/config.js) (and match the `tailscale serve`
-port), or set `window.PROTORAG_DEFAULT_BACKEND_URL` before `main.js` loads.
+Both are already wired in [`docker-compose.local.yml`](docker-compose.local.yml)
+and the bundled frontend defaults
+([`static/js/config.js`](static/js/config.js): `DEFAULT_OLLAMA_BASE_URL =
+http://host.docker.internal:11434`). Two host-side requirements:
+
+1. **Ollama must listen on all interfaces** so the container can reach it
+   through the host-gateway (the default `127.0.0.1` bind is not reachable from
+   inside Docker):
+
+   ```bash
+   OLLAMA_HOST=0.0.0.0 ollama serve
+   ```
+
+2. **The data directory must be writable by uid 1000** (the container user),
+   or auth 500s with `unable to open database file`:
+
+   ```bash
+   mkdir -p ~/protorag_storage
+   sudo chown -R 1000:1000 ~/protorag_storage
+   ```
+
+Recreate the container after editing the compose so `extra_hosts` takes effect:
+
+```bash
+docker compose -f docker-compose.local.yml up -d --build
+```
+
+To target a different host/port, edit `DEFAULT_BACKEND_URL` /
+`DEFAULT_OLLAMA_BASE_URL` in [`static/js/config.js`](static/js/config.js) (and
+match the `tailscale serve` port), or set `window.PROTORAG_DEFAULT_BACKEND_URL`
+/ `window.PROTORAG_DEFAULT_OLLAMA_URL` before `main.js` loads.
 
 ---
 

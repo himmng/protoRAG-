@@ -39,7 +39,17 @@ services:
     volumes:
       # All RAG data — vector DB, originals, users.db — lives on YOUR disk
       # under ~/protorag_storage. Nothing ever leaves the machine.
+      #
+      # NOTE: the container runs as uid 1000 (appuser). The host directory must
+      # be writable by that uid or guest/Google auth 500s with
+      # "unable to open database file". One-time fix on the host:
+      #   mkdir -p ~/protorag_storage && sudo chown -R 1000:1000 ~/protorag_storage
       - "${HOME}/protorag_storage:/data"
+    # Lets the container reach the host's Ollama as http://host.docker.internal:11434
+    # (inside the container "localhost" is the container itself, not the host).
+    # Requires Ollama to listen on all interfaces: OLLAMA_HOST=0.0.0.0 ollama serve
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://127.0.0.1:8000/api/health').status == 200 else sys.exit(1)"]

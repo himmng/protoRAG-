@@ -19,7 +19,7 @@ import {
     getGoogleProfile, getMode, getToken,
     setGoogleIdToken, setGoogleProfile, setMode, setToken,
 } from './api.js';
-import { config, DEFAULT_BACKEND_URL, escapeHtml, PUBLIC_GOOGLE_CLIENT_ID, state } from './config.js';
+import { config, DEFAULT_BACKEND_URL, DEFAULT_OLLAMA_BASE_URL, escapeHtml, PUBLIC_GOOGLE_CLIENT_ID, state } from './config.js';
 import { loadSessions, loadSessionHistory } from './sessions.js';
 
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
@@ -257,6 +257,12 @@ async function connectDefaultBackend() {
 function applyDefaultBackend() {
     if (!config.backend_url) config.backend_url = DEFAULT_BACKEND_URL;
     config.provider        = config.provider        || 'ollama';
+    // The bundled backend runs in Docker and reaches the host's Ollama via the
+    // host-gateway alias, not the container's own localhost. Replace the stock
+    // localhost default, but leave any URL the user customised in Settings.
+    if (!config.base_url || config.base_url === 'http://localhost:11434') {
+        config.base_url = DEFAULT_OLLAMA_BASE_URL;
+    }
     config.model_name      = config.model_name      || 'gemma-4-e4b:latest';
     config.embedding_model = config.embedding_model || 'embeddinggemma:latest';
     try { localStorage.setItem('app_config', JSON.stringify(config)); } catch { /* private mode */ }

@@ -22,6 +22,16 @@ export const DEFAULT_BACKEND_URL =
     (typeof window !== 'undefined' && window.PROTORAG_DEFAULT_BACKEND_URL) ||
     'https://my-ubuntu.tail8e3f2b.ts.net:8443';
 
+// LLM/embedding provider URL the bundled backend uses to reach Ollama. The
+// backend runs in Docker on the my-ubuntu host, and Ollama runs on that same
+// host, so "localhost" inside the container is wrong — it must use the docker
+// host-gateway alias (see `extra_hosts` in docker-compose.local.yml). This is
+// resolved server-side by the backend, never by the browser.
+// Override per-deployment with `window.PROTORAG_DEFAULT_OLLAMA_URL`.
+export const DEFAULT_OLLAMA_BASE_URL =
+    (typeof window !== 'undefined' && window.PROTORAG_DEFAULT_OLLAMA_URL) ||
+    'http://host.docker.internal:11434';
+
 export const PROVIDER_DEFAULTS = {
     ollama:    { base_url: 'http://localhost:11434',     api_key: 'none',      hint: 'Auto-appends /v1 · needs OLLAMA_ORIGINS set' },
     lmstudio:  { base_url: 'http://localhost:1234',      api_key: 'lm-studio', hint: 'Auto-appends /v1 · LM Studio server mode' },
