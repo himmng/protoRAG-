@@ -33,7 +33,7 @@ export const DEFAULT_OLLAMA_BASE_URL =
     'http://host.docker.internal:11434';
 
 export const PROVIDER_DEFAULTS = {
-    ollama:    { base_url: 'http://localhost:11434',     api_key: 'none',      hint: 'Auto-appends /v1 · needs OLLAMA_ORIGINS set' },
+    ollama:    { base_url: DEFAULT_OLLAMA_BASE_URL,      api_key: 'none',      hint: 'Auto-appends /v1 · needs OLLAMA_ORIGINS set' },
     lmstudio:  { base_url: 'http://localhost:1234',      api_key: 'lm-studio', hint: 'Auto-appends /v1 · LM Studio server mode' },
     openai:    { base_url: 'https://api.openai.com/v1',  api_key: '',          hint: 'Include /v1 in URL · real API key required' },
     litellm:   { base_url: 'http://localhost:4000',      api_key: 'any',       hint: 'Proxy root · /v1 added by LiteLLM automatically' },
@@ -56,7 +56,7 @@ export const config = {
     backend_url:     '',
     data_dir:        '',
     provider:        'ollama',
-    base_url:        'http://localhost:11434',
+    base_url:        DEFAULT_OLLAMA_BASE_URL,
     api_key:         'none',
     model_name:      'gemma-4-e4b:latest',
     embedding_model: 'embeddinggemma:latest',

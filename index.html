@@ -454,6 +454,10 @@
                 <!-- Step 1 — pick a backend. The primary path connects to the
                      default backend; "Configure backend URL" is the escape hatch. -->
                 <div class="flex flex-col gap-2.5">
+                    <p class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-slate-400">
+                        <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-indian-red/15 text-indian-red text-[9px] font-bold">1</span>
+                        Connect the backend
+                    </p>
                     <button id="auth-gate-connect" class="connect-btn group w-full py-3 px-4 rounded-2xl text-sm font-semibold text-white flex items-center justify-center gap-2">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-90">
                             <rect x="2" y="2" width="20" height="8" rx="2"></rect>
@@ -470,11 +474,10 @@
                     </button>
                 </div>
 
-                <div class="flex items-center gap-3 text-[10px] font-medium uppercase tracking-[0.2em] text-gray-400 dark:text-slate-600">
-                    <div class="flex-1 h-px bg-gradient-to-r from-transparent via-gray-200 dark:via-slate-700 to-transparent"></div>
-                    <span>then sign in</span>
-                    <div class="flex-1 h-px bg-gradient-to-r from-transparent via-gray-200 dark:via-slate-700 to-transparent"></div>
-                </div>
+                <p class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-slate-400">
+                    <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-indian-red/15 text-indian-red text-[9px] font-bold">2</span>
+                    Continue with Google or as guest
+                </p>
 
                 <div id="auth-gate-google" class="w-full flex justify-center min-h-[44px]"></div>
 
