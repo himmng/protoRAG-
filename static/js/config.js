@@ -12,12 +12,15 @@ export const PUBLIC_GOOGLE_CLIENT_ID =
 
 // Default backend the "Connect with backend" gate button points at. This is
 // the host that runs the protoRAG FastAPI server (which in turn talks to the
-// Ollama provider configured below). Served over HTTPS via `tailscale serve`
-// so the HTTPS Netlify page can reach it without a mixed-content block.
+// Ollama provider configured below). Exposed over HTTPS on :8443 via
+// `tailscale serve` (port 443 on this host is taken by Nextcloud), which
+// gives a browser-trusted cert so the HTTPS Netlify page can reach it without
+// a mixed-content or cert error. The matching server-side command is:
+//   tailscale serve --bg --https=8443 http://127.0.0.1:8000
 // Override per-deployment with `window.PROTORAG_DEFAULT_BACKEND_URL`.
 export const DEFAULT_BACKEND_URL =
     (typeof window !== 'undefined' && window.PROTORAG_DEFAULT_BACKEND_URL) ||
-    'https://my-ubuntu.tail8e3f2b.ts.net';
+    'https://my-ubuntu.tail8e3f2b.ts.net:8443';
 
 export const PROVIDER_DEFAULTS = {
     ollama:    { base_url: 'http://localhost:11434',     api_key: 'none',      hint: 'Auto-appends /v1 · needs OLLAMA_ORIGINS set' },
