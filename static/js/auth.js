@@ -19,7 +19,7 @@ import {
     getGoogleProfile, getMode, getToken,
     setGoogleIdToken, setGoogleProfile, setMode, setToken,
 } from './api.js';
-import { config, DEFAULT_BACKEND_URL, DEFAULT_OLLAMA_BASE_URL, escapeHtml, PUBLIC_GOOGLE_CLIENT_ID, state } from './config.js';
+import { config, DEFAULT_BACKEND_URL, DEFAULT_OLLAMA_BASE_URL, escapeHtml, PUBLIC_GOOGLE_CLIENT_ID, setCurrentSessionId, state } from './config.js';
 import { loadSessions, loadSessionHistory } from './sessions.js';
 
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
@@ -157,6 +157,7 @@ export function refreshAuthUI() {
     const slot = document.getElementById('auth-slot');
     if (!slot) return;
     const mode = getMode();
+    updateGuestBanner(mode);
     if (mode === 'google') {
         const profile = getGoogleProfile();
         if (profile) { renderProfilePill(slot, profile); return; }
@@ -194,6 +195,11 @@ async function handleCredentialResponse(response) {
     setMode('google');
     setGoogleIdToken(idToken);
     setGoogleProfile(profile);
+    // Drop any bearer token left over from a prior guest session. Without this,
+    // `_doExchange` short-circuits on `if (getToken()) return true` and NEVER
+    // calls /api/auth/google — so we'd stay bound to the guest user_id and the
+    // Google account's real conversation history would never load.
+    setToken(null);
     hideGate();
     refreshAuthUI();
     // Try to mint the backend session immediately; if the backend isn't
@@ -269,9 +275,26 @@ function applyDefaultBackend() {
 }
 
 async function continueAsGuest() {
+    // Every explicit "Continue as guest" starts a brand-new, isolated guest
+    // identity. We must drop any token/identity left in localStorage by a
+    // PREVIOUS guest first — otherwise `ensureBackendSession` reuses that stale
+    // bearer token (its `if (getToken()) return true` short-circuit) and two
+    // different people on the same browser end up sharing one user_id, and thus
+    // one conversation + history. Anonymous guests are intentionally ephemeral
+    // (incognito-style); persistent cross-visit history is what signing in with
+    // Google is for.
+    clearAuth();
+    localStorage.removeItem('pr_guest_seed');   // fresh avatar for the new guest
+    localStorage.removeItem('last_session_id'); // don't inherit the old chat pointer
     setMode('guest');
+    // Reset the in-memory pointer to a fresh chat so the UI starts clean while
+    // the new backend session is being minted.
+    setCurrentSessionId(crypto.randomUUID());
+    document.getElementById('messages').innerHTML = '';
     hideGate();
     refreshAuthUI();
+    // Forces a fresh POST /api/auth/guest now that no token is cached, minting a
+    // new anonymous user_id with its own isolated storage.
     await ensureBackendSession();
     try {
         await loadSessions();
@@ -292,9 +315,19 @@ async function signOut() {
 
 // ── Gate visibility ───────────────────────────────────────────────────
 
+// Top flyer reminding guests their chats are ephemeral. Visible only while the
+// active identity is an anonymous guest; hidden for Google users (whose history
+// is persisted) and while the gate is up.
+function updateGuestBanner(mode) {
+    const el = document.getElementById('guest-mode-banner');
+    if (el) el.classList.toggle('hidden', mode !== 'guest');
+}
+
 function showGate() {
     const gate = document.getElementById('auth-gate');
     if (gate) gate.classList.remove('hidden');
+    // The gate covers the app — never leave the guest flyer showing behind it.
+    updateGuestBanner(null);
 }
 
 function hideGate() {
@@ -342,10 +375,23 @@ function wireGateGoogle(clientId) {
  * orthogonal — main.js surfaces that separately.
  */
 export async function bootAuth() {
-    // The gate is shown on every visit (even for returning users) so the
-    // backend + identity are re-confirmed each time. Make sure the default
-    // backend is in place so the gate's identity buttons work immediately.
+    // Make sure the default backend is in place so the gate's identity buttons
+    // (and any direct Google boot below) work immediately.
     applyDefaultBackend();
+
+    // Returning Google users skip the gate / backend-connect screen entirely
+    // and boot straight into the app — their identity is already established and
+    // their history is persisted server-side. The gate is only for picking an
+    // identity, which a signed-in Google user has already done. Their backend
+    // session is minted lazily by apiFetch when main.js loads the session list.
+    if (getMode() === 'google' && getGoogleProfile()) {
+        hideGate();
+        refreshAuthUI();
+        return { gated: false };
+    }
+
+    // No identity yet, or guest mode: show the gate. Guests re-confirm on every
+    // visit so each one gets a fresh, isolated session (see continueAsGuest).
     document.getElementById('auth-gate-connect').addEventListener('click', connectDefaultBackend, { once: false });
     document.getElementById('auth-gate-guest').addEventListener('click', continueAsGuest, { once: false });
     wireGateGoogle(PUBLIC_GOOGLE_CLIENT_ID);

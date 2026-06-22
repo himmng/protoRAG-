@@ -518,6 +518,15 @@
         </div>
     </div>
 
+    <!-- Guest-mode flyer. Toggled by auth.js (updateGuestBanner) — visible only
+         while the active identity is an anonymous guest. -->
+    <div id="guest-mode-banner" class="hidden fixed top-3 left-1/2 -translate-x-1/2 z-30 px-2 max-w-[90vw]">
+        <div class="flex items-center gap-2 rounded-full bg-indian-red/10 dark:bg-indian-red/20 border border-indian-red/30 px-4 py-1.5 text-[11px] font-medium text-indian-red shadow-sm">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <span class="truncate">Guest mode: your chat conversations are temporary and won't be saved.</span>
+        </div>
+    </div>
+
     <!-- Mobile sidebar backdrop -->
     <div id="sidebar-backdrop" onclick="closeMobileSidebar()"></div>
 
