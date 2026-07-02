@@ -88,7 +88,10 @@ Only devices on your Tailscale tailnet will be able to reach the LLM endpoint, g
 
 ## Running with Docker
 
-A separate README (`README-docker.md`) contains details. The basic flow:
+See [Deploying the frontend on Netlify](#deploying-the-frontend-on-netlify-with-local-backend)
+below for the full Netlify + tunnel walkthrough, or use `docker compose up -d
+--build` (see [`docker-compose.yml`](docker-compose.yml)) for the one-command
+setup. The basic manual flow:
 
 1. Build the image:
 
@@ -108,6 +111,9 @@ A separate README (`README-docker.md`) contains details. The basic flow:
 
    - Inside the container, the app listens on `http://0.0.0.0:8000`.
    - All documents, Chroma DB files, and histories live under `/app/data` in the container (mapped to `/path/on/host`).
+   - Set `-e ENABLE_CLOUDFLARE_TUNNEL=true` to also start a Cloudflare quick
+     tunnel exposing port `8000` publicly over HTTPS (URL printed to
+     `docker logs`).
 
 3. Inside the UI Settings (when running in Docker):
 
@@ -206,7 +212,7 @@ locally-running container. Only your **Ollama** model needs to be reachable
 lives on a different machine).
 
 ```bash
-docker compose -f docker-compose.local.yml up -d --build
+docker compose up -d --build
 ```
 
 That single command:
@@ -219,6 +225,11 @@ That single command:
   fetches from the deployed site succeed.
 - Mounts `~/protorag_storage` into the container as `/data`; your vector DB,
   documents, and `users.db` live on your disk.
+
+If the Netlify page needs to reach this backend from somewhere other than the
+same machine, set `ENABLE_CLOUDFLARE_TUNNEL=true` for a public HTTPS URL — see
+[Expose the local backend over HTTPS](#3-expose-the-local-backend-over-https)
+below.
 
 Then in your browser:
 
@@ -256,19 +267,19 @@ no browser flags needed.
 
 ---
 
-## One-click "Connect with backend" (bundled default)
+## One-click "Connect with backend"
 
 The auth gate at <https://protorag.netlify.app> shows a **Connect with backend**
-button as step 1, above the Google / guest sign-in options. It points at a
-backend baked into the frontend so users don't have to paste a URL. The default
-is defined in [`static/js/config.js`](static/js/config.js) and can be overridden
-at runtime with `window.PROTORAG_DEFAULT_BACKEND_URL`:
+button as step 1, above the Google / guest sign-in options. By default it
+points at **same-origin** (an empty `DEFAULT_BACKEND_URL` in
+[`static/js/config.js`](static/js/config.js)) — correct when `index.html` is
+served by the same backend it talks to (e.g. opening `http://localhost:8000/`
+directly). There's no universal default that works across every deployer's
+machine, so for a cross-origin setup (Netlify frontend + your own local
+backend) you must point it at your backend explicitly, either:
 
-```js
-export const DEFAULT_BACKEND_URL =
-    (typeof window !== 'undefined' && window.PROTORAG_DEFAULT_BACKEND_URL) ||
-    'https://my-ubuntu.tail8e3f2b.ts.net:8443';
-```
+- in **Settings → Backend URL** (persisted to `localStorage`), or
+- by setting `window.PROTORAG_DEFAULT_BACKEND_URL` before `main.js` loads.
 
 Clicking the button applies the bundled defaults (provider `ollama`, LLM model
 `gemma-4-e4b:latest`, embedding model `embeddinggemma:latest`), probes
@@ -276,49 +287,29 @@ Clicking the button applies the bundled defaults (provider `ollama`, LLM model
 visit** so the backend + identity are re-confirmed each time.
 
 > The frontend talks to the **protoRAG FastAPI backend**, which in turn talks to
-> Ollama server-side — the browser never hits Ollama directly. So the default
-> URL must point at the FastAPI backend, not at Ollama's `:11434`.
+> Ollama server-side — the browser never hits Ollama directly. So the URL you
+> configure must point at the FastAPI backend, not at Ollama's `:11434`.
 
-### Why `:8443` and not `:443`
+### Getting a backend URL for the Netlify flow
 
-The Netlify page is HTTPS, so the backend must be HTTPS with a
-**browser-trusted** cert — a plain `http://…` backend is blocked as mixed
-content, and a self-signed cert is rejected. `tailscale serve` issues a real
-cert automatically. Port `443` is often already in use on a host (e.g. by
-Nextcloud), so this setup uses `8443`.
-
-### Server-side setup (run on the backend host)
-
-These steps run on the machine that hosts the backend (`my-ubuntu` in the
-default). The frontend can't do them for you.
+Run the backend locally with Docker (see [Deploying the frontend on
+Netlify](#deploying-the-frontend-on-netlify-with-local-backend) below for the
+full walkthrough):
 
 ```bash
-# 1. Build & start the backend (binds 127.0.0.1:8000; CORS already allows Netlify).
-docker compose -f docker-compose.local.yml up -d --build
-
-# 2. Expose it over Tailscale with a real HTTPS cert on :8443.
-#    (443 is taken by Nextcloud on this host, so use 8443.)
-tailscale serve --bg --https=8443 http://127.0.0.1:8000
-
-# 3. Verify — this must return JSON like {"status":"ok",...}, not HTML.
-tailscale serve status
-curl -s https://my-ubuntu.tail8e3f2b.ts.net:8443/api/health
+docker compose up -d --build
 ```
 
-Once `curl` returns the health JSON, reload the Netlify site and **Connect with
-backend** turns green.
+This binds the backend to `127.0.0.1:8000`. If you're on the same machine as
+the browser, `http://localhost:8000` already works. If you need the Netlify
+page to reach a backend running elsewhere (or just prefer not to open a port
+to your LAN), set `ENABLE_CLOUDFLARE_TUNNEL=true` to get a public HTTPS URL —
+see below.
 
-### Everything runs on the backend host
+### Local LLM resources
 
-In this setup the dockerized backend on `my-ubuntu` uses **that host's**
-resources for everything:
-
-| Resource | Where | How the container reaches it |
-|---|---|---|
-| LLM + embeddings (Ollama) | host Ollama on `:11434` | `http://host.docker.internal:11434` via the `extra_hosts` host-gateway alias |
-| Vector DB + documents + `users.db` | host disk `~/protorag_storage` | bind-mounted to `/data` (`DEFAULT_DATA_DIR=/data`) |
-
-Both are already wired in [`docker-compose.local.yml`](docker-compose.local.yml)
+The dockerized backend reaches your host's Ollama via the Docker
+host-gateway alias, already wired in [`docker-compose.yml`](docker-compose.yml)
 and the bundled frontend defaults
 ([`static/js/config.js`](static/js/config.js): `DEFAULT_OLLAMA_BASE_URL =
 http://host.docker.internal:11434`). Two host-side requirements:
@@ -342,13 +333,13 @@ http://host.docker.internal:11434`). Two host-side requirements:
 Recreate the container after editing the compose so `extra_hosts` takes effect:
 
 ```bash
-docker compose -f docker-compose.local.yml up -d --build
+docker compose up -d --build
 ```
 
 To target a different host/port, edit `DEFAULT_BACKEND_URL` /
-`DEFAULT_OLLAMA_BASE_URL` in [`static/js/config.js`](static/js/config.js) (and
-match the `tailscale serve` port), or set `window.PROTORAG_DEFAULT_BACKEND_URL`
-/ `window.PROTORAG_DEFAULT_OLLAMA_URL` before `main.js` loads.
+`DEFAULT_OLLAMA_BASE_URL` in [`static/js/config.js`](static/js/config.js), or
+set `window.PROTORAG_DEFAULT_BACKEND_URL` / `window.PROTORAG_DEFAULT_OLLAMA_URL`
+before `main.js` loads.
 
 ---
 
@@ -393,9 +384,31 @@ never opens that URL directly, it just `fetch`es from it.
 
 ### 3. Expose the local backend over HTTPS
 
-`SameSite=None` cookies require `Secure`, which requires HTTPS. Use a
-**named Cloudflare Tunnel** so the hostname is stable (a quick tunnel
-rotates every restart and breaks the CORS allowlist):
+`SameSite=None` cookies require `Secure`, which requires HTTPS.
+
+#### 3a. Quick tunnel (built into the Docker image — easiest)
+
+`cloudflared` is bundled in the image and started for you when you set
+`ENABLE_CLOUDFLARE_TUNNEL=true` — no Cloudflare account, no extra install:
+
+```bash
+ENABLE_CLOUDFLARE_TUNNEL=true docker compose up -d --build
+docker compose logs -f
+# look for a line like: https://random-words-1234.trycloudflare.com
+```
+
+Paste that URL into `https://your-site.netlify.app` → **Settings** → Backend
+URL → **Test** → **Save**. The tunnel is HTTPS end-to-end, so the auth bearer
+token flow works without any extra cert setup.
+
+Tradeoffs: the URL **rotates every container restart** (re-paste it each
+time you `up`/restart), and there's no custom domain. For a stable hostname,
+use the named tunnel or Tailscale Funnel below instead.
+
+#### 3b. Stable-hostname alternative (named Cloudflare Tunnel or Tailscale Funnel)
+
+Use a **named Cloudflare Tunnel** so the hostname is stable (unlike the quick
+tunnel above, which rotates every restart):
 
 ```bash
 brew install cloudflared

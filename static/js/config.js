@@ -10,17 +10,17 @@ export const PUBLIC_GOOGLE_CLIENT_ID =
     (typeof window !== 'undefined' && window.PROTORAG_GOOGLE_CLIENT_ID) ||
     '970498019467-97pb8cvibpo6nocudk7jhu6nthfasi2r.apps.googleusercontent.com';
 
-// Default backend the "Connect with backend" gate button points at. This is
-// the host that runs the protoRAG FastAPI server (which in turn talks to the
-// Ollama provider configured below). Exposed over HTTPS on :8443 via
-// `tailscale serve` (port 443 on this host is taken by Nextcloud), which
-// gives a browser-trusted cert so the HTTPS Netlify page can reach it without
-// a mixed-content or cert error. The matching server-side command is:
-//   tailscale serve --bg --https=8443 http://127.0.0.1:8000
-// Override per-deployment with `window.PROTORAG_DEFAULT_BACKEND_URL`.
+// Default backend the "Connect with backend" gate button points at. No
+// portable default exists across deployments (every deployer's backend URL
+// is different), so this intentionally defaults to same-origin (empty
+// string) — correct for "open http://localhost:8000 directly" or "index.html
+// served by the same backend it talks to". Netlify-hosted frontends talking
+// to a separate/tunneled backend must set this explicitly, either via
+// Settings → Backend URL (persisted in localStorage) or by setting
+// `window.PROTORAG_DEFAULT_BACKEND_URL` before main.js loads.
 export const DEFAULT_BACKEND_URL =
     (typeof window !== 'undefined' && window.PROTORAG_DEFAULT_BACKEND_URL) ||
-    'https://my-ubuntu.tail8e3f2b.ts.net:8443';
+    '';
 
 // LLM/embedding provider URL the bundled backend uses to reach Ollama. The
 // backend runs in Docker on the my-ubuntu host, and Ollama runs on that same

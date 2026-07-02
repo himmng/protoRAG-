@@ -1,19 +1,24 @@
 # One-command launcher for the "Netlify frontend + fully local backend" setup.
 #
-#   docker compose -f docker-compose.local.yml up -d --build
+#   docker compose up -d --build
 #
 # After it boots, open https://protorag.netlify.app/, sign in (Google or
 # guest), then in Settings paste `http://localhost:8000` as the Backend URL
 # and your Ollama tunnel URL as the LLM Base URL. Auth uses a bearer token
 # stored in your browser's localStorage — no cookie cross-origin tricks
 # required.
+#
+# To make the backend reachable from the internet (e.g. for the Netlify
+# flow above when not on the same machine), set ENABLE_CLOUDFLARE_TUNNEL=true.
+# The container prints a rotating https://*.trycloudflare.com URL to its
+# logs (`docker compose logs -f`) — paste that into Settings → Backend URL.
 
 services:
   protorag-backend:
     # Built locally from the Dockerfile in this repo. (The image can't be
     # published to GHCR under the repo's literal name because Docker image
     # references disallow "+", so we build instead of pull.)
-    #   docker compose -f docker-compose.local.yml up -d --build
+    #   docker compose up -d --build
     build:
       context: .
     image: protorag-local:latest
@@ -36,6 +41,12 @@ services:
       # backend, drop your OAuth client ID here (and add the Netlify origin
       # to Authorized JavaScript origins in Google Cloud Console).
       GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+      # Opt-in: expose port 8000 to the internet via an ephemeral Cloudflare
+      # "quick tunnel" (no Cloudflare account needed). The generated
+      # https://xxxx.trycloudflare.com URL is printed to the container logs
+      # and rotates on every restart. Default off so purely-local users
+      # don't get an extra outbound process.
+      ENABLE_CLOUDFLARE_TUNNEL: "${ENABLE_CLOUDFLARE_TUNNEL:-false}"
     volumes:
       # All RAG data — vector DB, originals, users.db — lives on YOUR disk
       # under ~/protorag_storage. Nothing ever leaves the machine.
