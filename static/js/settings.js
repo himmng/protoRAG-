@@ -1,7 +1,7 @@
 // Settings modal, provider-defaults toggling, backend health probe, dark mode.
 
 import { ensureBackendSession, getMode, setToken } from './api.js';
-import { config, PROVIDER_DEFAULTS, URL_HINTS, state } from './config.js';
+import { config, fetchBackendProviderDefaults, PROVIDER_DEFAULTS, URL_HINTS, state } from './config.js';
 import { loadSessions, loadSessionHistory } from './sessions.js';
 
 export function onProviderChange(provider) {
@@ -34,8 +34,11 @@ export async function testBackendConnection() {
         clearTimeout(timer);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json().catch(() => ({}));
+        const gotDefaults = await fetchBackendProviderDefaults(raw || window.location.origin);
+        if (gotDefaults) updateConfigUI();
         dot.className = 'inline-block w-2 h-2 rounded-full bg-green-500';
-        status.textContent = 'Connected — ' + (data.service || 'backend reachable');
+        status.textContent = 'Connected — ' + (data.service || 'backend reachable')
+            + (gotDefaults ? ' (provider settings loaded from backend)' : '');
         status.className = 'text-[10px] text-green-600 dark:text-green-400 mt-1';
     } catch (err) {
         dot.className = 'inline-block w-2 h-2 rounded-full bg-red-500';

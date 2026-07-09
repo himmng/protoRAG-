@@ -46,15 +46,16 @@ function _guessLocalBackendUrl() {
 // of re-deriving (or forgetting) it themselves.
 export const EFFECTIVE_DEFAULT_BACKEND_URL = DEFAULT_BACKEND_URL || _guessLocalBackendUrl();
 
-// LLM/embedding provider URL the bundled backend uses to reach Ollama. The
-// backend runs in Docker on the my-ubuntu host, and Ollama runs on that same
-// host, so "localhost" inside the container is wrong — it must use the docker
-// host-gateway alias (see `extra_hosts` in docker-compose.local.yml). This is
-// resolved server-side by the backend, never by the browser.
+// Placeholder LLM/embedding provider URL shown before a backend has ever
+// reported its own — see `fetchBackendProviderDefaults` below, which is the
+// real source of truth once connected (only the backend operator actually
+// knows whether Ollama is bare-metal, in Docker via the host-gateway alias,
+// on a tailnet, ...; guessing it here is what broke non-Docker setups
+// before). `http://localhost:11434` is the plain-Ollama-on-this-host default.
 // Override per-deployment with `window.PROTORAG_DEFAULT_OLLAMA_URL`.
 export const DEFAULT_OLLAMA_BASE_URL =
     (typeof window !== 'undefined' && window.PROTORAG_DEFAULT_OLLAMA_URL) ||
-    'http://host.docker.internal:11434';
+    'http://localhost:11434';
 
 export const PROVIDER_DEFAULTS = {
     ollama:    { base_url: DEFAULT_OLLAMA_BASE_URL,      api_key: 'none',      hint: 'Auto-appends /v1 · needs OLLAMA_ORIGINS set' },
@@ -107,6 +108,27 @@ export const state = {
 export function setCurrentSessionId(sid) {
     state.currentSessionId = sid;
     localStorage.setItem('last_session_id', sid);
+}
+
+// Pulls the backend operator's own provider defaults (set via
+// PROTORAG_DEFAULT_* env vars on the backend) and applies whichever fields
+// it actually reports on top of the current config. Call this right after a
+// "Connect with backend" / Settings "Test" succeeds, so users who already
+// have their backend configured for their own Ollama/LM Studio/etc. setup
+// don't have to re-type Base URL / API key / model names by hand — the one
+// piece of information only the backend operator has (where the provider
+// actually lives) comes from the backend instead of being guessed here.
+export async function fetchBackendProviderDefaults(backendUrl) {
+    try {
+        const res = await fetch((backendUrl || '').replace(/\/$/, '') + '/api/config/defaults');
+        if (!res.ok) return false;
+        const defaults = await res.json();
+        if (defaults && typeof defaults === 'object' && Object.keys(defaults).length) {
+            Object.assign(config, defaults);
+            return true;
+        }
+    } catch { /* best-effort — keep whatever defaults were already in place */ }
+    return false;
 }
 
 export function escapeHtml(str) {

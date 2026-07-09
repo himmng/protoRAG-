@@ -5,6 +5,8 @@ import os
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
+from ..config import DEFAULT_PROVIDER_CONFIG
+
 
 router = APIRouter()
 
@@ -12,6 +14,17 @@ router = APIRouter()
 @router.get("/api/health")
 def health():
     return {"status": "ok", "service": "protoRAG+"}
+
+
+@router.get("/api/config/defaults")
+def config_defaults():
+    """Provider defaults this backend operator has configured (if any).
+
+    Only fields actually set via env vars are included — the frontend fills
+    these in once the backend connection succeeds, and leaves its own
+    PROVIDER_DEFAULTS in place for anything the backend didn't specify.
+    """
+    return {k: v for k, v in DEFAULT_PROVIDER_CONFIG.items() if v}
 
 
 # Bundled-UI serving is opt-in. Docker sets SERVE_FRONTEND=true so the single

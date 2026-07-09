@@ -28,7 +28,9 @@ RUN chmod +x ./entrypoint.sh
 
 ENV PYTHONUNBUFFERED=1 \
     DEFAULT_DATA_DIR=/app/data \
-    SERVE_FRONTEND=true
+    SERVE_FRONTEND=true \
+    PROTORAG_DEFAULT_PROVIDER=ollama \
+    PROTORAG_DEFAULT_BASE_URL=http://host.docker.internal:11434
 
 EXPOSE 8000
 

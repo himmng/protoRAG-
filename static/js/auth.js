@@ -19,7 +19,7 @@ import {
     getGoogleProfile, getMode, getToken,
     setGoogleIdToken, setGoogleProfile, setMode, setToken,
 } from './api.js';
-import { config, DEFAULT_OLLAMA_BASE_URL, EFFECTIVE_DEFAULT_BACKEND_URL, escapeHtml, PUBLIC_GOOGLE_CLIENT_ID, setCurrentSessionId, state } from './config.js';
+import { config, DEFAULT_OLLAMA_BASE_URL, EFFECTIVE_DEFAULT_BACKEND_URL, escapeHtml, fetchBackendProviderDefaults, PUBLIC_GOOGLE_CLIENT_ID, setCurrentSessionId, state } from './config.js';
 import { loadSessions, loadSessionHistory } from './sessions.js';
 
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
@@ -243,7 +243,9 @@ async function connectDefaultBackend() {
         clearTimeout(timer);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json().catch(() => ({}));
-        setStatus('Connected — ' + (data.service || 'backend reachable') + '. Now sign in below.',
+        const gotDefaults = await fetchBackendProviderDefaults(EFFECTIVE_DEFAULT_BACKEND_URL);
+        setStatus('Connected — ' + (data.service || 'backend reachable')
+                  + (gotDefaults ? ' (provider settings loaded from backend)' : '') + '. Now sign in below.',
                   'text-green-600 dark:text-green-400');
     } catch (err) {
         const msg = err.name === 'AbortError' ? 'timed out (6s) — is the backend up?'
