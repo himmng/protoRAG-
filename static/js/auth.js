@@ -19,7 +19,7 @@ import {
     getGoogleProfile, getMode, getToken,
     setGoogleIdToken, setGoogleProfile, setMode, setToken,
 } from './api.js';
-import { config, DEFAULT_BACKEND_URL, DEFAULT_OLLAMA_BASE_URL, escapeHtml, PUBLIC_GOOGLE_CLIENT_ID, setCurrentSessionId, state } from './config.js';
+import { config, DEFAULT_OLLAMA_BASE_URL, EFFECTIVE_DEFAULT_BACKEND_URL, escapeHtml, PUBLIC_GOOGLE_CLIENT_ID, setCurrentSessionId, state } from './config.js';
 import { loadSessions, loadSessionHistory } from './sessions.js';
 
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
@@ -218,8 +218,8 @@ async function connectDefaultBackend() {
     // This button is an explicit promise to use the bundled default backend,
     // so force it even if a custom URL was previously configured. A backend
     // change invalidates any token minted by the old one.
-    const switching = config.backend_url !== DEFAULT_BACKEND_URL;
-    config.backend_url = DEFAULT_BACKEND_URL;
+    const switching = config.backend_url !== EFFECTIVE_DEFAULT_BACKEND_URL;
+    config.backend_url = EFFECTIVE_DEFAULT_BACKEND_URL;
     applyDefaultBackend();
     if (switching) setToken(null);
 
@@ -234,12 +234,12 @@ async function connectDefaultBackend() {
     };
 
     if (btn) btn.disabled = true;
-    setStatus('Connecting to ' + DEFAULT_BACKEND_URL + '…', 'text-gray-400 dark:text-slate-500');
+    setStatus('Connecting to ' + EFFECTIVE_DEFAULT_BACKEND_URL + '…', 'text-gray-400 dark:text-slate-500');
 
     try {
         const ctrl  = new AbortController();
         const timer = setTimeout(() => ctrl.abort(), 6000);
-        const res   = await fetch(DEFAULT_BACKEND_URL.replace(/\/$/, '') + '/api/health', { signal: ctrl.signal });
+        const res   = await fetch(EFFECTIVE_DEFAULT_BACKEND_URL.replace(/\/$/, '') + '/api/health', { signal: ctrl.signal });
         clearTimeout(timer);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json().catch(() => ({}));
@@ -249,7 +249,7 @@ async function connectDefaultBackend() {
         const msg = err.name === 'AbortError' ? 'timed out (6s) — is the backend up?'
                   : (err instanceof TypeError) ? 'blocked by the browser — backend down, or CORS/HTTPS not allowing this origin.'
                   : (err.message || 'unreachable');
-        setStatus('Could not reach ' + DEFAULT_BACKEND_URL + ' — ' + msg
+        setStatus('Could not reach ' + EFFECTIVE_DEFAULT_BACKEND_URL + ' — ' + msg
                   + ' You can still continue and fix the URL in Settings.',
                   'text-red-600 dark:text-red-400');
     } finally {
@@ -261,7 +261,7 @@ async function connectDefaultBackend() {
 // persist them. Only fills the backend URL when none is set, so a user who
 // already configured a custom backend keeps it.
 function applyDefaultBackend() {
-    if (!config.backend_url) config.backend_url = DEFAULT_BACKEND_URL;
+    if (!config.backend_url) config.backend_url = EFFECTIVE_DEFAULT_BACKEND_URL;
     config.provider        = config.provider        || 'ollama';
     // The bundled backend runs in Docker and reaches the host's Ollama via the
     // host-gateway alias, not the container's own localhost. Replace the stock

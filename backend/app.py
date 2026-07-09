@@ -71,9 +71,11 @@ app.include_router(sessions_router)
 app.include_router(documents_router)
 app.include_router(health_router)
 
-# Frontend ES modules. Mounted only when the static/ dir exists so a
-# minimal deploy (just backend, no frontend) still boots.
-if os.path.isdir("static"):
+# Frontend ES modules. Only mounted when SERVE_FRONTEND is enabled (Docker's
+# bundled single-container mode) and the static/ dir exists, so a plain
+# backend-only run (uvicorn / python -m backend) doesn't expose it.
+_serve_frontend = os.environ.get("SERVE_FRONTEND", "false").strip().lower() in ("1", "true", "yes")
+if _serve_frontend and os.path.isdir("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
 

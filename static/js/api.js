@@ -143,7 +143,13 @@ export async function apiFetch(url, options = {}) {
     // recursion.
     const isAuthEndpoint = /\/api\/auth\/(guest|google|status|me|logout)\b/.test(url);
     if (!isAuthEndpoint && !getToken() && getMode()) {
-        await ensureBackendSession();
+        const ok = await ensureBackendSession();
+        if (!ok) {
+            // Backend is unreachable — fail fast with a message that tells
+            // the user what to do, instead of letting the network request
+            // proceed and surface a generic "Failed to fetch".
+            throw new Error('Backend not connected. Set the Backend URL in Settings.');
+        }
     }
     const token = getToken();
     const headers = new Headers(options.headers || {});

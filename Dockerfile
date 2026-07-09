@@ -27,7 +27,8 @@ COPY entrypoint.sh ./
 RUN chmod +x ./entrypoint.sh
 
 ENV PYTHONUNBUFFERED=1 \
-    DEFAULT_DATA_DIR=/app/data
+    DEFAULT_DATA_DIR=/app/data \
+    SERVE_FRONTEND=true
 
 EXPOSE 8000
 
