@@ -762,6 +762,18 @@
                     <div id="url-hint" class="text-[10px] text-gray-400 mt-1 ml-1"></div>
                 </div>
 
+                <!-- Diagnostics: live self-test of the actual pipeline (data dir,
+                     CORS config, LLM/embedding provider reachability, model
+                     availability) against the backend currently configured above —
+                     answers "what's actually broken" instead of guessing. -->
+                <div class="surface-inset rounded-2xl p-4">
+                    <div class="flex items-center justify-between gap-3 mb-2">
+                        <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Diagnostics</p>
+                        <button onclick="runDiagnostics()" id="run-diagnostics-btn" class="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-slate-800 hover:brightness-95 dark:hover:brightness-125 transition-all">Run Diagnostics</button>
+                    </div>
+                    <div id="diagnostics-results" class="hidden text-[11px] font-mono space-y-1"></div>
+                </div>
+
                 <!-- Provider cheat-sheet -->
                 <div class="surface-inset rounded-2xl p-4">
                     <p class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3">Provider quick-reference</p>

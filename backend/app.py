@@ -1,6 +1,8 @@
 """FastAPI app assembly: middleware, router mounts, shutdown hook."""
 
 import os
+import time
+import uuid
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,15 +10,40 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import Response
 
 from .auth.routes import router as auth_router
+from .logging_config import get_logger, set_request_id
 from .rag.chroma import flush_all_vectorstores
 from .routes.chat import router as chat_router
+from .routes.diagnostics import router as diagnostics_router
 from .routes.documents import router as documents_router
 from .routes.health import router as health_router
 from .routes.sessions import router as sessions_router
 from .routes.upload import router as upload_router
 
+log = get_logger("request")
 
 app = FastAPI(title="protoRAG+ API")
+
+
+@app.middleware("http")
+async def _request_logging(request, call_next):
+    # Every request gets a short id threaded through a contextvar (see
+    # logging_config.py) so log lines from deep inside RAG retrieval, the
+    # LLM call, or embeddings can be tied back to the request that
+    # triggered them — the whole point of this being a *pipeline* trace
+    # rather than one-off print()s scattered around.
+    rid = uuid.uuid4().hex[:8]
+    set_request_id(rid)
+    start = time.monotonic()
+    log.info("→ %s %s", request.method, request.url.path)
+    try:
+        response = await call_next(request)
+    except Exception:
+        log.exception("✗ %s %s raised", request.method, request.url.path)
+        raise
+    duration_ms = (time.monotonic() - start) * 1000
+    log.info("← %s %s %d (%.0fms)", request.method, request.url.path, response.status_code, duration_ms)
+    response.headers["X-Request-Id"] = rid
+    return response
 
 # CORS for cross-origin frontends (Netlify, etc.). When `PROTORAG_CORS_ORIGINS`
 # is set, credentials (auth cookies) are allowed and origins are tightened to
@@ -70,6 +97,7 @@ app.include_router(chat_router)
 app.include_router(sessions_router)
 app.include_router(documents_router)
 app.include_router(health_router)
+app.include_router(diagnostics_router)
 
 # Frontend ES modules. Only mounted when SERVE_FRONTEND is enabled (Docker's
 # bundled single-container mode) and the static/ dir exists, so a plain

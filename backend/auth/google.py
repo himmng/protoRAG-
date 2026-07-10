@@ -12,6 +12,10 @@ from typing import Optional
 
 from fastapi import HTTPException
 
+from ..logging_config import get_logger
+
+log = get_logger("auth.google")
+
 
 @dataclass
 class GoogleProfile:
@@ -51,6 +55,7 @@ def verify_id_token(id_token_str: str) -> GoogleProfile:
     except ValueError as e:
         # ValueError is the library's catch-all for bad signature, wrong audience,
         # expired token, etc. Surface as 401 so the frontend prompts re-signin.
+        log.error("Google ID token verification failed: %s", e)
         raise HTTPException(status_code=401, detail=f"Invalid Google ID token: {e}")
 
     if not payload.get("email_verified"):

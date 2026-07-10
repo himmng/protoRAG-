@@ -12,6 +12,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from ..auth.db import User
 from ..auth.deps import current_user
 from ..config import ChatRequest
+from ..logging_config import get_logger
 from ..paths import _validate_session, resolve_dirs
 from ..rag.chroma import _release_session, get_vectorstore
 from ..rag.embeddings import get_embeddings
@@ -23,6 +24,7 @@ from ..state import _session_locks
 
 
 router = APIRouter()
+log = get_logger("chat")
 
 
 @router.post("/api/chat")
@@ -31,6 +33,10 @@ async def chat(request: ChatRequest, user: User = Depends(current_user)):
     session_id = request.session_id
     raw_message = request.message
     config = request.config
+    log.info(
+        "chat request: session=%s user=%s provider=%s model=%s message_len=%d",
+        session_id, user.user_id, config.provider, config.model_name, len(raw_message),
+    )
 
     db_dir, docs_dir = resolve_dirs(user.user_id, request.data_dir)
     mentioned_files, query = parse_at_mentions(raw_message)
@@ -102,11 +108,13 @@ async def chat(request: ChatRequest, user: User = Depends(current_user)):
                     # ChromaDB Rust backend crashes with MMR + where filter — use
                     # plain similarity_search which goes through a different code path.
                     docs = vectorstore.similarity_search(query, k=k, filter=where_filter)
-                    print(f"[RAG] @filter {where_filter} → {len(docs)} chunks")
+                    log.info("RAG @filter %s → %d chunks", where_filter, len(docs))
             else:
                 docs = vectorstore.max_marginal_relevance_search(query, k=k, fetch_k=fetch_k)
-                print(f"[RAG] MMR → {len(docs)} chunks from "
-                      f"{sorted({d.metadata.get('doc_filename', '?') for d in docs})}")
+                log.info(
+                    "RAG MMR → %d chunks from %s",
+                    len(docs), sorted({d.metadata.get('doc_filename', '?') for d in docs}),
+                )
 
             if docs:
                 grouped: dict[str, list[str]] = {}
@@ -120,8 +128,8 @@ async def chat(request: ChatRequest, user: User = Depends(current_user)):
                 sources = sorted(grouped.keys())
 
         except Exception as e:
-            print(f"[RAG] Retrieval error: {e}")
-            traceback.print_exc()
+            log.error("RAG retrieval error: %s: %s", type(e).__name__, e)
+            log.debug("RAG retrieval traceback:\n%s", traceback.format_exc())
             if "Error finding id" in str(e):
                 # Mark the index as corrupted so subsequent requests skip RAG
                 # while the background task wipes and rebuilds. Release the
@@ -242,13 +250,21 @@ async def chat(request: ChatRequest, user: User = Depends(current_user)):
 
     async def generate():
         full_response = ""
+        token_count = 0
+        log.info("LLM stream: starting call (provider=%s base_url=%s)", config.provider, config.base_url)
         try:
             async for chunk in llm.astream(messages):
                 token = chunk.content if hasattr(chunk, "content") else str(chunk)
                 if token:
+                    token_count += 1
                     full_response += token
                     yield f"data: {json.dumps({'content': token})}\n\n"
+            log.info("LLM stream: completed, %d tokens", token_count)
         except Exception as e:
+            log.error(
+                "LLM stream failed: provider=%s base_url=%s model=%s error=%s: %s",
+                config.provider, config.base_url, config.model_name, type(e).__name__, e,
+            )
             err = f"\n\n**Connection Error:** {e}"
             full_response += err
             yield f"data: {json.dumps({'content': err})}\n\n"

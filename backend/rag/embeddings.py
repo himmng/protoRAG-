@@ -3,6 +3,9 @@
 from langchain_openai import OpenAIEmbeddings
 
 from ..config import ChatConfig
+from ..logging_config import get_logger
+
+log = get_logger("embeddings")
 
 
 def _safe_api_key(key: str) -> str:
@@ -32,6 +35,7 @@ def get_embeddings(config: ChatConfig) -> OpenAIEmbeddings:
         embed_url = normalise_base_url(config.provider, config.base_url)
         embed_key = _safe_api_key(config.api_key)
 
+    log.info("Embeddings client: provider=%s base_url=%s model=%s", config.provider, embed_url, config.embedding_model)
     return OpenAIEmbeddings(
         model=config.embedding_model,
         openai_api_base=embed_url,

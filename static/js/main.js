@@ -29,6 +29,7 @@ Object.assign(window, {
     testBackendConnection: settings.testBackendConnection,
     onProviderChange:      settings.onProviderChange,
     saveSettings:          settings.saveSettings,
+    runDiagnostics:        settings.runDiagnostics,
     closeDocModal:         preview.closeDocModal,
     handleAtMention:       mentions.handleAtMention,
     handleAtMentionKey:    mentions.handleAtMentionKey,

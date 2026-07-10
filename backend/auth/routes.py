@@ -29,9 +29,11 @@ from .deps import (
     set_guest_cookie,
 )
 from .google import google_client_id, verify_id_token
+from ..logging_config import get_logger
 
 
 router = APIRouter()
+log = get_logger("auth")
 
 
 @router.get("/api/auth/me")
@@ -74,6 +76,7 @@ def continue_as_guest(response: Response):
     user = create_anonymous_user()
     token = create_auth_token(user.user_id, "guest", GUEST_TTL_SECONDS)
     set_guest_cookie(response, token)
+    log.info("guest session minted: user=%s", user.user_id)
     # Token is also returned in the body so cross-origin clients (Netlify
     # frontend → localhost backend) can store it in localStorage and send it
     # as `Authorization: Bearer …` instead of relying on the cookie.
@@ -128,6 +131,7 @@ def google_login(
         name=profile.name or "",
         picture=profile.picture or "",
     )
+    log.info("google session minted: user=%s email=%s", user.user_id, profile.email)
 
     # Mint a fresh auth session and swap cookies.
     token = create_auth_token(user.user_id, "google", AUTH_TTL_SECONDS)

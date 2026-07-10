@@ -125,6 +125,61 @@ export async function saveSettings() {
     }
 }
 
+// Live self-test of the actual pipeline (data dir writable, CORS config,
+// LLM/embedding provider reachability, model availability) against whatever
+// is currently typed into the form — not the saved config — so you can
+// check a change before hitting Save. Answers "what's actually broken"
+// directly instead of guessing from a vague chat-side error.
+export async function runDiagnostics() {
+    const resultsEl = document.getElementById('diagnostics-results');
+    const btn = document.getElementById('run-diagnostics-btn');
+    const backendUrl = (document.getElementById('config-backend').value.trim() || window.location.origin).replace(/\/$/, '');
+
+    const body = {
+        provider:        document.getElementById('config-provider').value,
+        base_url:        document.getElementById('config-url').value.trim(),
+        api_key:         document.getElementById('config-key').value.trim(),
+        model_name:      document.getElementById('config-model').value.trim(),
+        embedding_model: document.getElementById('config-embed').value.trim(),
+    };
+
+    btn.disabled = true;
+    btn.textContent = 'Running…';
+    resultsEl.classList.remove('hidden');
+    resultsEl.innerHTML = '<div class="text-gray-400">Checking data dir, CORS, and provider reachability…</div>';
+
+    const LABELS = {
+        data_dir: 'Data directory', cors: 'CORS', llm_provider: 'LLM provider',
+        embedding_provider: 'Embedding provider', llm_model: 'Model availability',
+    };
+
+    try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 10000);
+        const res = await fetch(backendUrl + '/api/diagnostics', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: ctrl.signal,
+        });
+        clearTimeout(timer);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        resultsEl.innerHTML = Object.entries(data.checks || {}).map(([key, check]) => {
+            const icon = check.ok ? '<span class="text-green-600 dark:text-green-400">✓</span>'
+                                   : '<span class="text-red-600 dark:text-red-400">✗</span>';
+            return `<div>${icon} <span class="font-bold">${LABELS[key] || key}</span>: `
+                 + `<span class="text-gray-500 dark:text-slate-400">${check.detail}</span></div>`;
+        }).join('');
+    } catch (err) {
+        const msg = err.name === 'AbortError' ? 'timed out (10s)' : (err.message || 'unreachable');
+        resultsEl.innerHTML = `<div class="text-red-600 dark:text-red-400">✗ Could not reach ${backendUrl}/api/diagnostics — ${msg}</div>`;
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Run Diagnostics';
+    }
+}
+
 export function toggleDarkMode() {
     const isDark = document.documentElement.classList.toggle('dark');
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
