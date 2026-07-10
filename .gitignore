@@ -20,5 +20,6 @@ __pycache__/
 data/
 node_modules/
 protorag_storage/
-.claude
+.venv/
+.claude/
 
